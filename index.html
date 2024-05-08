@@ -25,8 +25,9 @@
         <svg id="main-svg" :view-box.camel="svgViewBox" :width="width" :height="height"
             @pointerdown="pointerDownHandler" @pointermove="pointerMoveHandler" @pointerup="pointerUpHandler"
             @wheel="wheelHandler">
-            <g v-for="hat in hats">
-                <polygon :points="getPolylinePoints(hat)" fill="white" stroke="black" />
+            <g v-for="(hat, i) in hats">
+                <polygon :points="getPolylinePoints(hat)" fill="white" stroke="black"
+                    @pointerdown="hatHold($event, i)" />
             </g>
         </svg>
     </div>
@@ -177,6 +178,28 @@
                     this.scale *= scaleFactor;
                 }
             },
+            hatHold(e, i) {
+                const [x0, y0] = this.getMousePosition(e);
+                const [hx0, hy0] = [this.hats[i].x, this.hats[i].y];
+                const handler = (e_) => {
+                    const [x, y] = this.getMousePosition(e_);
+                    const dx = (x - x0) / this.scale;
+                    const dy = (y - y0) / this.scale;
+
+                    // const a = 1;
+                    const b = -1 / Math.sqrt(3);
+                    // const c = 0;
+                    const d = 2 / Math.sqrt(3);
+
+                    const dxx = Math.floor(dx + b * dy);
+                    const dyy = Math.floor(d * dy);
+
+                    this.hats[i].x = hx0 + dxx;
+                    this.hats[i].y = hy0 + dyy;
+                }
+                this.moveHandler = handler;
+                e.stopPropagation();
+            },
         },
         mounted() {
             this.resize();
@@ -184,12 +207,15 @@
 
             this.svg = document.getElementById('main-svg');
 
-            const n = 64;
-            for (let i = 0; i < n; i++) {
-                for (let j = 0; j < n; j++) {
-                    this.hats.push({ x: i * 5, y: j * 5, r: (i + j) % 6 });
-                }
-            }
+            // const n = 64;
+            // for (let i = 0; i < n; i++) {
+            //     for (let j = 0; j < n; j++) {
+            //         this.hats.push({ x: i * 5, y: j * 5, r: (i + j) % 6 });
+            //     }
+            // }
+            this.hats.push({ x: 0, y: 0, r: 0 });
+            this.hats.push({ x: 10, y: 0, r: 2 });
+            this.hats.push({ x: -10, y: 0, r: 4 });
         },
     }).mount('#app')
 </script>
