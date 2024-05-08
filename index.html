@@ -27,7 +27,7 @@
             @wheel="wheelHandler">
             <g v-for="(hat, i) in hats">
                 <polygon :points="getPolylinePoints(hat)" fill="white" :stroke="hat.selected ? 'black' : 'gray'"
-                    @pointerdown="hatSelect($event, i)" />
+                    @pointerdown="hatSelect($event, hat, i)" />
             </g>
         </svg>
     </div>
@@ -121,8 +121,8 @@
                 this.height = window.innerHeight;
             },
             clearSelected() {
-                for (i of this.selected) {
-                    this.hats[i].selected = false;
+                for (hat of this.selected) {
+                    hat.selected = false;
                 }
                 this.selected = [];
             },
@@ -172,9 +172,9 @@
             calcCog() {
                 let cogX = 0;
                 let cogY = 0;
-                for (j of this.selected) {
-                    cogX += this.hats[j].x;
-                    cogY += this.hats[j].y;
+                for (hat of this.selected) {
+                    cogX += hat.x;
+                    cogY += hat.y;
                 }
                 cogX = Math.round(cogX / this.selected.length);
                 cogY = Math.round(cogY / this.selected.length);
@@ -190,22 +190,22 @@
                     const [cogX, cogY] = this.calcCog();
 
                     // Rotate around the cog
-                    for (i of this.selected) {
-                        const dx = this.hats[i].dx;
-                        const dy = this.hats[i].dy;
+                    for (hat of this.selected) {
+                        const dx = hat.dx;
+                        const dy = hat.dy;
                         if (e.deltaY > 0) {
                             // -60 deg rotation
-                            this.hats[i].dx = 1 * dx + 1 * dy;
-                            this.hats[i].dy = -1 * dx + 0 * dy;
-                            this.hats[i].r = (this.hats[i].r - 1 + 6) % 6;
+                            hat.dx = 1 * dx + 1 * dy;
+                            hat.dy = -1 * dx + 0 * dy;
+                            hat.r = (hat.r - 1 + 6) % 6;
                         } else {
                             // 60 deg rotation
-                            this.hats[i].dx = 0 * dx - 1 * dy;
-                            this.hats[i].dy = 1 * dx + 1 * dy;
-                            this.hats[i].r = (this.hats[i].r + 1 + 6) % 6;
+                            hat.dx = 0 * dx - 1 * dy;
+                            hat.dy = 1 * dx + 1 * dy;
+                            hat.r = (hat.r + 1 + 6) % 6;
                         }
-                        this.hats[i].x = cogX + this.hats[i].dx;
-                        this.hats[i].y = cogY + this.hats[i].dy;
+                        hat.x = cogX + hat.dx;
+                        hat.y = cogY + hat.dy;
                     }
                 } else {
                     // Zoom in/out
@@ -226,26 +226,35 @@
                     }
                 }
             },
-            hatSelect(e, i) {
+            hatSelect(e, hat, i) {
                 e.stopPropagation();
 
-                if (!this.hats[i].selected && !e.ctrlKey) {
+                if (!hat.selected && !e.ctrlKey) {
                     this.clearSelected();
                 }
 
                 this.hatHeld = true;
-                if (!this.hats[i].selected) {
-                    this.selected.push(i);
-                    this.hats[i].selected = true;
+                if (!hat.selected) {
+                    this.selected.push(hat);
+                    hat.selected = true;
+                }
+
+                // Newly clicked hat is always front
+                // swap elements
+                const length = this.hats.length;
+                if (length > 1) {
+                    const tmp = this.hats[length - 1];
+                    this.hats[length - 1] = this.hats[i];
+                    this.hats[i] = tmp;
                 }
 
                 const [x0, y0] = this.getMousePosition(e);
                 const [cogX, cogY] = this.calcCog();
-                for (j of this.selected) {
-                    this.hats[j].dx = this.hats[j].x - cogX;
-                    this.hats[j].dy = this.hats[j].y - cogY;
+                for (hat of this.selected) {
+                    hat.dx = hat.x - cogX;
+                    hat.dy = hat.y - cogY;
                 }
-                const [hx0, hy0] = [this.hats[i].x, this.hats[i].y];
+                const [hx0, hy0] = [hat.x, hat.y];
                 const handler = (e_) => {
                     const [x, y] = this.getMousePosition(e_);
                     const dx = (x - x0) / this.scale;
@@ -259,9 +268,9 @@
                     const dxx = Math.round(dx + b * dy);
                     const dyy = Math.round(d * dy);
 
-                    for (j of this.selected) {
-                        this.hats[j].x = cogX + this.hats[j].dx + dxx;
-                        this.hats[j].y = cogY + this.hats[j].dy + dyy;
+                    for (hat of this.selected) {
+                        hat.x = cogX + hat.dx + dxx;
+                        hat.y = cogY + hat.dy + dyy;
                     }
                 }
                 this.moveHandler = handler;
