@@ -26,8 +26,8 @@
             @pointerdown="pointerDownHandler" @pointermove="pointerMoveHandler" @pointerup="pointerUpHandler"
             @wheel="wheelHandler">
             <g v-for="(hat, i) in hats">
-                <polygon :points="getPolylinePoints(hat)" fill="white" stroke="black"
-                    @pointerdown="hatHold($event, i)" />
+                <polygon :points="getPolylinePoints(hat)" fill="white" :stroke="hat.selected ? 'black' : 'gray'"
+                    @pointerdown="hatSelect($event, i)" />
             </g>
         </svg>
     </div>
@@ -40,16 +40,16 @@
 <script>
     const { createApp } = Vue
 
-    const hat = [
-        [0, -1],
-        [1, -1],
-        [1, 0],
-        [0, 1],
-        [1, 2],
-        [2, 1],
-        [3, -1],
-        [4, -1],
-    ];
+    // const hat = [
+    //     [0, -1],
+    //     [1, -1],
+    //     [1, 0],
+    //     [0, 1],
+    //     [1, 2],
+    //     [2, 1],
+    //     [3, -1],
+    //     [4, -1],
+    // ];
 
     const rotM = [
         [1, 0, 0, 1],
@@ -61,19 +61,19 @@
     ];
 
     const hatOutline = [
-        [0, 0],
-        [-1, -1],
-        [0, -2],
-        [2, -2],
-        [2, -1],
-        [4, -2],
-        [5, -1],
-        [4, 0],
+        [-1, 0],
+        [-2, -1],
+        [-1, -2],
+        [1, -2],
+        [1, -1],
+        [3, -2],
+        [4, -1],
         [3, 0],
-        [2, 2],
-        [0, 3],
-        [0, 2],
+        [2, 0],
+        [1, 2],
+        [-1, 3],
         [-1, 2],
+        [-2, 2],
     ];
 
     const hatOutlines = [];
@@ -100,7 +100,9 @@
                 cy: 0,
                 scale: 8,
                 hats: [],
+                selected: [],
                 moveHandler: null,
+                hatHeld: false,
                 svg: null,
             }
         },
@@ -117,6 +119,12 @@
             resize() {
                 this.width = window.innerWidth;
                 this.height = window.innerHeight;
+            },
+            clearSelected() {
+                for (i of this.selected) {
+                    this.hats[i].selected = false;
+                }
+                this.selected = [];
             },
             getPolylinePoints(hat) {
                 let res = "";
@@ -149,6 +157,8 @@
                     this.cy = cy0 - dy / this.scale;
                 }
                 this.moveHandler = handler;
+
+                this.clearSelected();
             },
             pointerMoveHandler(e) {
                 if (this.moveHandler !== null) {
@@ -156,29 +166,43 @@
                 }
             },
             pointerUpHandler() {
+                this.hatHeld = false;
                 this.moveHandler = null;
             },
             wheelHandler(e) {
-                e.preventDefault();
                 e.stopPropagation();
+                e.preventDefault();
 
-                const [x, y] = this.getMousePosition(e);
-                const dx = (x - this.width / 2) / this.scale;
-                const dy = (y - this.height / 2) / this.scale;
-
-                const scaleFactor = 1.2;
-
-                if (e.deltaY > 0) {
-                    this.cx = this.cx - dx * (scaleFactor - 1);
-                    this.cy = this.cy - dy * (scaleFactor - 1);
-                    this.scale /= scaleFactor;
+                if (this.hatHeld) {
+                    // Hat rotation
+                    // TODO: Use cog and support multiple hats rotation
+                    const i = this.selected[0];
+                    if (e.deltaY > 0) {
+                        this.hats[i].r = (this.hats[i].r + 1 + 6) % 6;
+                    } else {
+                        this.hats[i].r = (this.hats[i].r - 1 + 6) % 6;
+                    }
                 } else {
-                    this.cx = this.cx + dx * (1 - 1 / scaleFactor);
-                    this.cy = this.cy + dy * (1 - 1 / scaleFactor);
-                    this.scale *= scaleFactor;
+                    // Zoom in/out
+                    const [x, y] = this.getMousePosition(e);
+                    const dx = (x - this.width / 2) / this.scale;
+                    const dy = (y - this.height / 2) / this.scale;
+
+                    const scaleFactor = 1.2;
+
+                    if (e.deltaY > 0) {
+                        this.cx = this.cx - dx * (scaleFactor - 1);
+                        this.cy = this.cy - dy * (scaleFactor - 1);
+                        this.scale /= scaleFactor;
+                    } else {
+                        this.cx = this.cx + dx * (1 - 1 / scaleFactor);
+                        this.cy = this.cy + dy * (1 - 1 / scaleFactor);
+                        this.scale *= scaleFactor;
+                    }
                 }
             },
-            hatHold(e, i) {
+            hatSelect(e, i) {
+                e.stopPropagation();
                 const [x0, y0] = this.getMousePosition(e);
                 const [hx0, hy0] = [this.hats[i].x, this.hats[i].y];
                 const handler = (e_) => {
@@ -198,7 +222,24 @@
                     this.hats[i].y = hy0 + dyy;
                 }
                 this.moveHandler = handler;
+
+                this.hatHeld = true;
+
+                // TODO: Ctrl to append
+                this.clearSelected();
+                this.selected.push(i);
+                this.hats[i].selected = true;
+            },
+            hatRotate(e, i, r) {
                 e.stopPropagation();
+                e.preventDefault();
+                if (this.hatHeld) {
+                    if (e.deltaY > 0) {
+                        this.hats[i].r = (this.hats[i].r + r + 6) % 6;
+                    } else {
+                        this.hats[i].r = (this.hats[i].r - r + 6) % 6;
+                    }
+                }
             },
         },
         mounted() {
@@ -213,9 +254,9 @@
             //         this.hats.push({ x: i * 5, y: j * 5, r: (i + j) % 6 });
             //     }
             // }
-            this.hats.push({ x: 0, y: 0, r: 0 });
-            this.hats.push({ x: 10, y: 0, r: 2 });
-            this.hats.push({ x: -10, y: 0, r: 4 });
+            this.hats.push({ x: 0, y: 0, r: 0, selected: false });
+            this.hats.push({ x: 10, y: 0, r: 2, selected: false });
+            this.hats.push({ x: -10, y: 0, r: 4, selected: false });
         },
     }).mount('#app')
 </script>
