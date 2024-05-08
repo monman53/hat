@@ -14,11 +14,17 @@
         fill: #9999ff;
         stroke-width: 0.1;
     }
+
+    .svg-wrapper {
+        overflow: hidden;
+    }
 </style>
 
 <div id="app">
-    <div>
-        <svg :view-box.camel="svgViewBox" :width="width" :height="height">
+    <div class="svg-wrapper">
+        <svg id="main-svg" :view-box.camel="svgViewBox" :width="width" :height="height"
+            @pointerdown="pointerDownHandler" @pointermove="pointerMoveHandler" @pointerup="pointerUpHandler"
+            @wheel="wheelHandler">
             <g v-for="hat in hats">
                 <polygon :points="getPolylinePoints(hat)" fill="white" stroke="black" />
             </g>
@@ -44,6 +50,15 @@
         [4, -1],
     ];
 
+    const rotM = [
+        [1, 0, 0, 1],
+        [0, -1, 1, 1],
+        [-1, -1, 1, 0],
+        [-1, 0, 0, -1],
+        [0, 1, -1, -1],
+        [1, 1, -1, 0],
+    ];
+
     const hatOutline = [
         [0, 0],
         [-1, -1],
@@ -60,14 +75,20 @@
         [-1, 2],
     ];
 
-    const rotM = [
-        [1, 0, 0, 1],
-        [0, -1, 1, 1],
-        [-1, -1, 1, 0],
-        [-1, 0, 0, -1],
-        [0, 1, -1, -1],
-        [1, 1, -1, 0],
-    ];
+    const hatOutlines = [];
+    for (let i = 0; i < 6; i++) {
+        let rotOutline = [];
+        for (p of hatOutline) {
+            const x = rotM[i][0] * p[0] + rotM[i][1] * p[1];
+            const y = rotM[i][2] * p[0] + rotM[i][3] * p[1];
+            rotOutline.push([x, y]);
+        }
+        hatOutlines.push(rotOutline);
+    }
+
+    const deg60 = Math.PI / 3;
+    const cos60 = Math.cos(deg60);
+    const sin60 = Math.sin(deg60);
 
     createApp({
         data() {
@@ -76,14 +97,16 @@
                 height: window.innerHeight,
                 cx: 0,
                 cy: 0,
-                scale: 20,
+                scale: 8,
                 hats: [],
+                moveHandler: null,
+                svg: null,
             }
         },
         computed: {
             svgViewBox() {
-                const x = (this.cx - this.width / 2) / this.scale;
-                const y = (this.cy - this.height / 2) / this.scale;
+                const x = this.cx - this.width / 2 / this.scale;
+                const y = this.cy - this.height / 2 / this.scale;
                 const w = this.width / this.scale;
                 const h = this.height / this.scale;
                 return `${x} ${y} ${w} ${h}`
@@ -96,33 +119,77 @@
             },
             getPolylinePoints(hat) {
                 let res = "";
-                for (let p of hatOutline) {
-                    const r = ((hat.r % 6) + 6) % 6;
-                    const rot = rotM[r];
+                const r = ((hat.r % 6) + 6) % 6;
+                for (let p of hatOutlines[r]) {
+                    const x = p[0] + hat.x;
+                    const y = p[1] + hat.y;
 
-                    const x = rot[0] * p[0] + rot[1] * p[1];
-                    const y = rot[2] * p[0] + rot[3] * p[1];
+                    const xx = x + y * cos60;
+                    const yy = y * sin60;
 
-                    const xx = x + hat.x;
-                    const yy = y + hat.y;
-
-                    const theta = Math.PI / 3;
-                    const xxx = xx + yy * Math.cos(theta);
-                    const yyy = yy * Math.sin(theta)
-
-                    res += `${xxx} ${yyy} `
+                    res += `${xx} ${yy} `
                 }
                 return res;
+            },
+            getMousePosition(e) {
+                const rect = this.svg.getBoundingClientRect()
+                const x = e.clientX - rect.left;
+                const y = this.height - e.clientY - rect.top;
+                return [x, y];
+            },
+            pointerDownHandler(e) {
+                const [x0, y0] = this.getMousePosition(e);
+                const [cx0, cy0] = [this.cx, this.cy];
+                const handler = (e_) => {
+                    const [x, y] = this.getMousePosition(e_);
+                    const dx = (x - x0);
+                    const dy = (y - y0);
+                    this.cx = cx0 - dx / this.scale;
+                    this.cy = cy0 - dy / this.scale;
+                }
+                this.moveHandler = handler;
+            },
+            pointerMoveHandler(e) {
+                if (this.moveHandler !== null) {
+                    this.moveHandler(e);
+                }
+            },
+            pointerUpHandler() {
+                this.moveHandler = null;
+            },
+            wheelHandler(e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const [x, y] = this.getMousePosition(e);
+                const dx = (x - this.width / 2) / this.scale;
+                const dy = (y - this.height / 2) / this.scale;
+
+                const scaleFactor = 1.2;
+
+                if (e.deltaY > 0) {
+                    this.cx = this.cx - dx * (scaleFactor - 1);
+                    this.cy = this.cy - dy * (scaleFactor - 1);
+                    this.scale /= scaleFactor;
+                } else {
+                    this.cx = this.cx + dx * (1 - 1 / scaleFactor);
+                    this.cy = this.cy + dy * (1 - 1 / scaleFactor);
+                    this.scale *= scaleFactor;
+                }
             },
         },
         mounted() {
             this.resize();
             window.addEventListener('resize', this.resize);
 
-            this.hats.push({ x: 0, y: -4, r: -7 });
-            this.hats.push({ x: 0, y: 0, r: 0 });
-            this.hats.push({ x: 0, y: 4, r: 1 });
-            this.hats.push({ x: 0, y: 8, r: 2 });
+            this.svg = document.getElementById('main-svg');
+
+            const n = 64;
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    this.hats.push({ x: i * 5, y: j * 5, r: (i + j) % 6 });
+                }
+            }
         },
     }).mount('#app')
 </script>
