@@ -151,10 +151,10 @@
                 const [cx0, cy0] = [this.cx, this.cy];
                 const handler = (e_) => {
                     const [x, y] = this.getMousePosition(e_);
-                    const dx = (x - x0);
-                    const dy = (y - y0);
-                    this.cx = cx0 - dx / this.scale;
-                    this.cy = cy0 - dy / this.scale;
+                    const dx = (x - x0) / this.scale;
+                    const dy = (y - y0) / this.scale;
+                    this.cx = cx0 - dx;
+                    this.cy = cy0 - dy;
                 }
                 this.moveHandler = handler;
 
@@ -169,18 +169,43 @@
                 this.hatHeld = false;
                 this.moveHandler = null;
             },
+            calcCog() {
+                let cogX = 0;
+                let cogY = 0;
+                for (j of this.selected) {
+                    cogX += this.hats[j].x;
+                    cogY += this.hats[j].y;
+                }
+                cogX = Math.round(cogX / this.selected.length);
+                cogY = Math.round(cogY / this.selected.length);
+                return [cogX, cogY];
+            },
             wheelHandler(e) {
                 e.stopPropagation();
                 e.preventDefault();
 
                 if (this.hatHeld) {
                     // Hat rotation
-                    // TODO: Use cog and support multiple hats rotation
-                    const i = this.selected[0];
-                    if (e.deltaY > 0) {
-                        this.hats[i].r = (this.hats[i].r + 1 + 6) % 6;
-                    } else {
-                        this.hats[i].r = (this.hats[i].r - 1 + 6) % 6;
+
+                    const [cogX, cogY] = this.calcCog();
+
+                    // Rotate around the cog
+                    for (i of this.selected) {
+                        const dx = this.hats[i].dx;
+                        const dy = this.hats[i].dy;
+                        if (e.deltaY > 0) {
+                            // -60 deg rotation
+                            this.hats[i].dx = 1 * dx + 1 * dy;
+                            this.hats[i].dy = -1 * dx + 0 * dy;
+                            this.hats[i].r = (this.hats[i].r - 1 + 6) % 6;
+                        } else {
+                            // 60 deg rotation
+                            this.hats[i].dx = 0 * dx - 1 * dy;
+                            this.hats[i].dy = 1 * dx + 1 * dy;
+                            this.hats[i].r = (this.hats[i].r + 1 + 6) % 6;
+                        }
+                        this.hats[i].x = cogX + this.hats[i].dx;
+                        this.hats[i].y = cogY + this.hats[i].dy;
                     }
                 } else {
                     // Zoom in/out
@@ -203,7 +228,23 @@
             },
             hatSelect(e, i) {
                 e.stopPropagation();
+
+                if (!this.hats[i].selected && !e.ctrlKey) {
+                    this.clearSelected();
+                }
+
+                this.hatHeld = true;
+                if (!this.hats[i].selected) {
+                    this.selected.push(i);
+                    this.hats[i].selected = true;
+                }
+
                 const [x0, y0] = this.getMousePosition(e);
+                const [cogX, cogY] = this.calcCog();
+                for (j of this.selected) {
+                    this.hats[j].dx = this.hats[j].x - cogX;
+                    this.hats[j].dy = this.hats[j].y - cogY;
+                }
                 const [hx0, hy0] = [this.hats[i].x, this.hats[i].y];
                 const handler = (e_) => {
                     const [x, y] = this.getMousePosition(e_);
@@ -218,28 +259,12 @@
                     const dxx = Math.round(dx + b * dy);
                     const dyy = Math.round(d * dy);
 
-                    this.hats[i].x = hx0 + dxx;
-                    this.hats[i].y = hy0 + dyy;
-                }
-                this.moveHandler = handler;
-
-                this.hatHeld = true;
-
-                // TODO: Ctrl to append
-                this.clearSelected();
-                this.selected.push(i);
-                this.hats[i].selected = true;
-            },
-            hatRotate(e, i, r) {
-                e.stopPropagation();
-                e.preventDefault();
-                if (this.hatHeld) {
-                    if (e.deltaY > 0) {
-                        this.hats[i].r = (this.hats[i].r + r + 6) % 6;
-                    } else {
-                        this.hats[i].r = (this.hats[i].r - r + 6) % 6;
+                    for (j of this.selected) {
+                        this.hats[j].x = cogX + this.hats[j].dx + dxx;
+                        this.hats[j].y = cogY + this.hats[j].dy + dyy;
                     }
                 }
+                this.moveHandler = handler;
             },
         },
         mounted() {
