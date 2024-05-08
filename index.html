@@ -27,7 +27,7 @@
             @wheel="wheelHandler">
             <g v-for="(hat, i) in hats">
                 <polygon :points="getPolylinePoints(hat)" fill="white" :stroke="hat.selected ? 'black' : 'gray'"
-                    @pointerdown="hatSelect($event, hat, i)" />
+                    @pointerdown="hatSelect($event, hat, i)" @dblclick="hatReflect($event, hat)" />
             </g>
         </svg>
     </div>
@@ -77,11 +77,24 @@
     ];
 
     const hatOutlines = [];
+    // Non-reflected hats
     for (let i = 0; i < 6; i++) {
         let rotOutline = [];
         for (p of hatOutline) {
             const x = rotM[i][0] * p[0] + rotM[i][1] * p[1];
             const y = rotM[i][2] * p[0] + rotM[i][3] * p[1];
+            rotOutline.push([x, y]);
+        }
+        hatOutlines.push(rotOutline);
+    }
+    // X-axis reflected hats
+    for (let i = 0; i < 6; i++) {
+        let rotOutline = [];
+        for (p of hatOutline) {
+            const xx = p[0] + p[1];
+            const yy = - p[1];
+            const x = rotM[i][0] * xx + rotM[i][1] * yy;
+            const y = rotM[i][2] * xx + rotM[i][3] * yy;
             rotOutline.push([x, y]);
         }
         hatOutlines.push(rotOutline);
@@ -129,9 +142,9 @@
             getPolylinePoints(hat) {
                 let res = "";
                 const r = ((hat.r % 6) + 6) % 6;
-                for (let p of hatOutlines[r]) {
-                    const x = p[0] + hat.x;
-                    const y = p[1] + hat.y;
+                for (let p of hatOutlines[hat.reflected ? 6 + r : r]) {
+                    const x = hat.x + p[0];
+                    const y = hat.y + p[1];
 
                     const xx = x + y * cos60;
                     const yy = y * sin60;
@@ -275,6 +288,9 @@
                 }
                 this.moveHandler = handler;
             },
+            hatReflect(e, hat) {
+                hat.reflected = !hat.reflected;
+            },
         },
         mounted() {
             this.resize();
@@ -282,15 +298,15 @@
 
             this.svg = document.getElementById('main-svg');
 
-            // const n = 64;
+            // const n = 16;
             // for (let i = 0; i < n; i++) {
             //     for (let j = 0; j < n; j++) {
-            //         this.hats.push({ x: i * 5, y: j * 5, r: (i + j) % 6 });
+            //         this.hats.push({ x: i * 5, y: j * 5, r: (i + j) % 6, selected: false });
             //     }
             // }
-            this.hats.push({ x: 0, y: 0, r: 0, selected: false });
-            this.hats.push({ x: 10, y: 0, r: 2, selected: false });
-            this.hats.push({ x: -10, y: 0, r: 4, selected: false });
+            this.hats.push({ x: 0, y: 0, r: 0, selected: false, reflected: false });
+            this.hats.push({ x: 10, y: 0, r: 2, selected: false, reflected: false });
+            this.hats.push({ x: -10, y: 0, r: 4, selected: false, reflected: false });
         },
     }).mount('#app')
 </script>
