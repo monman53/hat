@@ -191,8 +191,8 @@
                     // const c = 0;
                     const d = 2 / Math.sqrt(3);
 
-                    const dxx = Math.floor(dx + b * dy);
-                    const dyy = Math.floor(d * dy);
+                    const dxx = Math.round(dx + b * dy);
+                    const dyy = Math.round(d * dy);
 
                     this.hats[i].x = hx0 + dxx;
                     this.hats[i].y = hy0 + dyy;
