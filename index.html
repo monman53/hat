@@ -480,7 +480,22 @@
                         h7(depth - 1, Affine.mul(affine, Affine.rotTransition(0, { a: 3, b: 3 }, { a: -3, b: -3 })));
                     }
                 }
-                h7(1, Affine.identity());
+                const h8 = (depth, affine) => {
+                    if (depth == 0) {
+                        hats.push({ affine: affine });
+                    }
+                    if (depth == 1) {
+                        h7(depth - 1, Affine.mul(affine, Affine.rotation(-2)));
+                        h7(depth - 1, Affine.mul(affine, Affine.rotTransition(-3, { a: 0, b: -2 }, { a: 0, b: 4 })));
+                        h7(depth - 1, Affine.mul(affine, Affine.rotTransition(2, { a: 2, b: 0 }, { a: -1, b: 3 })));
+                        h7(depth - 1, Affine.mul(affine, Affine.mul(Affine.rotTransition(-1, { a: 3, b: 1 }, { a: -3, b: 1 }), Affine.flip())));
+                        h7(depth - 1, Affine.mul(affine, Affine.rotTransition(-2, { a: 3, b: 3 }, { a: 0, b: 0 })));
+                        h7(depth - 1, Affine.mul(affine, Affine.rotTransition(-1, { a: 1, b: 1 }, { a: -2, b: -2 })));
+                        h7(depth - 1, Affine.mul(affine, Affine.rotTransition(0, { a: 3, b: 3 }, { a: -3, b: -3 })));
+                        h7(depth - 1, Affine.mul(affine, Affine.rotTransition(-2, { a: -1, b: -3 }, { a: -1, b: 3 })));
+                    }
+                }
+                h8(1, Affine.identity());
                 return hats;
             },
         },
