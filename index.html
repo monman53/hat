@@ -17,14 +17,11 @@
 
     #stage {
         position: relative;
-        /* display: inline; */
-        /* overflow: hidden; */
     }
 
     #svg-wrapper,
     #toolbar {
         position: absolute;
-        overflow: hidden;
     }
 
     #main-svg {
@@ -50,7 +47,12 @@
                     @pointerdown="hatSelect($event, hat, i)" @dblclick="hatReflect($event, hat)" />
             </g> -->
                 <g v-for="(hat, i) in hats2">
-                    <polygon :points="getPolylinePoints2(hat)" fill="white" stroke="black" />
+                    <polygon :points="getPolylinePoints2(hat).svgPoints" fill="white" stroke="black" />
+                </g>
+                <g v-for="(hat, i) in hats2">
+                    <g v-for="node in getPolylinePoints2(hat).nodes">
+                        <circle :cx="node.ev.x" :cy="node.ev.y" r="0.1" @mouseover="coord = node.v" />
+                    </g>
                 </g>
             </svg>
         </div>
@@ -59,7 +61,8 @@
                 <input type="range" min="0" max="1" step="0.001" v-model.number="a">
                 a {{a}}
             </label><br>
-            Scale: {{ scale }}
+            Scale: {{ scale }}<br>
+            Node: {{coord}}
         </div>
     </div>
 </div>
@@ -67,6 +70,108 @@
 <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 <script>
     const { createApp } = Vue
+
+    class Affine {
+        constructor(a, b, c, d, e, f) {
+            // Affine matrix
+            // a, b, c
+            // d, e, f
+            // 0, 0, 1
+            this.a = a;
+            this.b = b;
+            this.c = { a: c.a, b: c.b };
+            this.d = d;
+            this.e = e;
+            this.f = { a: f.a, b: f.b };
+        }
+
+        static identity() {
+            return new Affine(1, 0, { a: 0, b: 0 }, 0, 1, { a: 0, b: 0 });
+        }
+
+        mul(m) {
+            return new Affine(
+                m.a * this.a + m.b * this.d,
+                m.a * this.b + m.b * this.e,
+                { a: m.a * this.c.a + m.b * this.f.a + m.c.a, b: m.a * this.c.b + m.b * this.f.b + m.c.b },
+                m.d * this.a + m.e * this.d,
+                m.d * this.b + m.e * this.e,
+                { a: m.d * this.c.a + m.e * this.f.a + m.f.a, b: m.d * this.c.b + m.e * this.f.b + m.f.b },
+            );
+        }
+
+        static mul(m, n) {
+            return new Affine(
+                m.a * n.a + m.b * n.d,
+                m.a * n.b + m.b * n.e,
+                { a: m.a * n.c.a + m.b * n.f.a + m.c.a, b: m.a * n.c.b + m.b * n.f.b + m.c.b },
+                m.d * n.a + m.e * n.d,
+                m.d * n.b + m.e * n.e,
+                { a: m.d * n.c.a + m.e * n.f.a + m.f.a, b: m.d * n.c.b + m.e * n.f.b + m.f.b },
+            );
+        }
+
+        mulVec(v) {
+            return {
+                x: {
+                    a: this.a * v.x.a + this.b * v.y.a + this.c.a,
+                    b: this.a * v.x.b + this.b * v.y.b + this.c.b,
+                },
+                y: {
+                    a: this.d * v.x.a + this.e * v.y.a + this.f.a,
+                    b: this.d * v.x.b + this.e * v.y.b + this.f.b,
+                },
+            };
+        }
+
+        transition(x, y) {
+            return new Affine(this.a, this.b, { a: this.c.a + x.a, b: this.c.b + x.b }, this.d, this.e, { a: this.f.a + y.a, b: this.f.b + y.b });
+        }
+
+        static transition(x, y) {
+            return new Affine(1, 0, { a: x.a, b: x.b }, 0, 1, { a: y.a, b: y.b });
+        }
+
+        static transitionRot(x, y, i) {
+            return this.transition(x, y).mul(this.rotation(i));
+        }
+
+        static rotTransition(i, x, y) {
+            return this.rotation(i).mul(this.transition(x, y));
+        }
+
+        static transitionAdd(x1, y1, x2, y2) {
+            return new Affine(1, 0, { a: x1.a + x2.a, b: x1.b + x2.b }, 0, 1, { a: y1.a + y2.a, b: y1.b + y2.b });
+        }
+
+        // flip() {
+        //     const a = this.a;
+        //     const b = this.b;
+        //     const c = this.c;
+        //     const d = this.d;
+        //     const e = this.e;
+        //     const f = this.f;
+        //     return new Affine(a + d, b + e, { a: c.a + f.a, b: c.b + f.b }, -d, -e, { a: -f.a, b: -f.b });
+        // }
+
+        static flip() {
+            // flip matrix [1, 1, 0, -1]
+            return this.rotation(3).mul(new Affine(1, 1, { a: 0, b: 0 }, 0, -1, { a: 0, b: 0 }));
+        }
+
+        static rotation60() {
+            return new Affine(0, -1, { a: 0, b: 0 }, 1, 1, { a: 0, b: 0 });
+        }
+
+        static rotation(i) {
+            i = (i % 6 + 6) % 6;
+            if (i == 0) {
+                return this.identity();
+            } else {
+                return this.rotation(i - 1).mul(this.rotation60());
+            }
+        }
+    }
 
     // const hat = [
     //     [0, -1],
@@ -139,8 +244,9 @@
                 height: window.innerHeight,
                 cx: 0,
                 cy: 0,
-                scale: 8,
+                scale: 32,
                 a: 0.5,
+                coord: null,
                 hats: [],
                 hats2: [],
                 selected: [],
@@ -184,48 +290,41 @@
                 return res;
             },
             getPolylinePoints2(hat) {
-                // const a = 0.5;
-                // const b = Math.sqrt(3);
-                // const [a, b] = [0.5, 0.5];
-                // const [a, b] = [0, 1];
-                // const [a, b] = [1, 0];
                 const [a, b] = [this.a, 1 - this.a];
 
                 const hatOutline2 = [
-                    { a: { x: 0, y: 0 }, b: { x: 0, y: 0 } },
-                    { a: { x: 0, y: 0 }, b: { x: -1, y: -1 } },
-                    { a: { x: 1, y: -1 }, b: { x: -1, y: -1 } },
-                    { a: { x: 3, y: -1 }, b: { x: -1, y: -1 } },
-                    { a: { x: 3, y: 0 }, b: { x: -1, y: -1 } },
-                    { a: { x: 3, y: 0 }, b: { x: 1, y: -2 } },
-                    { a: { x: 3, y: 0 }, b: { x: 2, y: -1 } },
-                    { a: { x: 2, y: 1 }, b: { x: 2, y: -1 } },
-                    { a: { x: 1, y: 1 }, b: { x: 2, y: -1 } },
-                    { a: { x: 1, y: 1 }, b: { x: 1, y: 1 } },
-                    { a: { x: 1, y: 1 }, b: { x: -1, y: 2 } },
-                    { a: { x: 1, y: 0 }, b: { x: -1, y: 2 } },
-                    { a: { x: 0, y: 0 }, b: { x: -1, y: 2 } },
+                    { x: { a: 0, b: 0 }, y: { a: 0, b: 0 } },
+                    { x: { a: 0, b: -1 }, y: { a: 0, b: -1 } },
+                    { x: { a: 1, b: -1 }, y: { a: -1, b: -1 } },
+                    { x: { a: 3, b: -1 }, y: { a: -1, b: -1 } },
+                    { x: { a: 3, b: -1 }, y: { a: 0, b: -1 } },
+                    { x: { a: 3, b: 1 }, y: { a: 0, b: -2 } },
+                    { x: { a: 3, b: 2 }, y: { a: 0, b: -1 } },
+                    { x: { a: 2, b: 2 }, y: { a: 1, b: -1 } },
+                    { x: { a: 1, b: 2 }, y: { a: 1, b: -1 } },
+                    { x: { a: 1, b: 1 }, y: { a: 1, b: 1 } },
+                    { x: { a: 1, b: -1 }, y: { a: 1, b: 2 } },
+                    { x: { a: 1, b: -1 }, y: { a: 0, b: 2 } },
+                    { x: { a: 0, b: -1 }, y: { a: 0, b: 2 } },
                 ];
 
                 const af = hat.affine;
 
                 let res = "";
+                let nodes = [];
                 for (let p of hatOutline2) {
-                    const ax = af[2].a + af[0] * p.a.x + af[1] * p.a.y;
-                    const ay = af[5].a + af[3] * p.a.x + af[4] * p.a.y;
+                    const v = af.mulVec(p);
 
-                    const bx = af[2].b + af[0] * p.b.x + af[1] * p.b.y;
-                    const by = af[5].b + af[3] * p.b.x + af[4] * p.b.y;
-
-                    const x = a * ax + b * bx;
-                    const y = a * ay + b * by;
+                    const x = a * v.x.a + b * v.x.b;
+                    const y = a * v.y.a + b * v.y.b;
 
                     const xx = x + y * cos60;
                     const yy = y * sin60;
 
                     res += `${xx} ${yy} `
+                    nodes.push({ v: v, ev: { x: xx, y: yy } });
                 }
-                return res;
+                return { svgPoints: res, nodes: nodes };
             },
             getMousePosition(e) {
                 const rect = this.svg.getBoundingClientRect()
@@ -366,14 +465,23 @@
                 hat.reflected = !hat.reflected;
             },
             hoge() {
-                const rec = (affine, depth) => {
+                let hats = [];
+                const h7 = (depth, affine) => {
                     if (depth == 0) {
-                        const newHat = {
-                            affine: affine,
-
-                        }
+                        hats.push({ affine: affine });
+                    }
+                    if (depth == 1) {
+                        h7(depth - 1, Affine.mul(affine, Affine.rotation(-2)));
+                        h7(depth - 1, Affine.mul(affine, Affine.rotTransition(-3, { a: 0, b: -2 }, { a: 0, b: 4 })));
+                        h7(depth - 1, Affine.mul(affine, Affine.rotTransition(2, { a: 2, b: 0 }, { a: -1, b: 3 })));
+                        h7(depth - 1, Affine.mul(affine, Affine.mul(Affine.rotTransition(-1, { a: 3, b: 1 }, { a: -3, b: 1 }), Affine.flip())));
+                        h7(depth - 1, Affine.mul(affine, Affine.rotTransition(-2, { a: 3, b: 3 }, { a: 0, b: 0 })));
+                        h7(depth - 1, Affine.mul(affine, Affine.rotTransition(-1, { a: 1, b: 1 }, { a: -2, b: -2 })));
+                        h7(depth - 1, Affine.mul(affine, Affine.rotTransition(0, { a: 3, b: 3 }, { a: -3, b: -3 })));
                     }
                 }
+                h7(1, Affine.identity());
+                return hats;
             },
         },
         mounted() {
@@ -382,8 +490,12 @@
 
             this.svg = document.getElementById('main-svg');
 
-            this.hats2.push({ affine: [1, 0, { a: 0, b: 0 }, 0, 1, { a: 0, b: 0 }] });
-            this.hats2.push({ affine: [1, 0, { a: -2, b: 0 }, 0, 1, { a: 1, b: 3 }] });
+            // this.hats2.push({ affine: Affine.identity() });
+            // this.hats2.push({ affine: Affine.transitionRot({ a: -2, b: 0 }, { a: 1, b: 3 }, 0) });
+            // this.hats2.push({ affine: Affine.flip().mul(Affine.rotTransition(3, { a: -1, b: -3 }, { a: 2, b: 6 })) });
+            // this.hats2.push({ affine: Affine.flip().transition({ a: -1, b: -3 }, { a: 2, b: 6 }) });
+
+            this.hats2 = this.hoge();
         },
     }).mount('#app')
 </script>
