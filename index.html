@@ -11,7 +11,6 @@
     }
 
     polygon {
-        fill: #9999ff;
         stroke-width: 0.1;
     }
 
@@ -47,7 +46,7 @@
                     @pointerdown="hatSelect($event, hat, i)" @dblclick="hatReflect($event, hat)" />
             </g> -->
                 <g v-for="(hat, i) in hats2">
-                    <polygon :points="getPolylinePoints2(hat).svgPoints" fill="white" stroke="black" />
+                    <polygon :points="getPolylinePoints2(hat).svgPoints" :fill="hat.color" stroke="black" />
                 </g>
                 <g v-if="options.showNodes">
                     <g v-for="(hat, i) in hats2">
@@ -218,6 +217,22 @@
         [-2, 2],
     ];
 
+    const hatOutline2 = [
+        { x: { a: 0, b: 0 }, y: { a: 0, b: 0 } },
+        { x: { a: 0, b: -1 }, y: { a: 0, b: -1 } },
+        { x: { a: 1, b: -1 }, y: { a: -1, b: -1 } },
+        { x: { a: 3, b: -1 }, y: { a: -1, b: -1 } },
+        { x: { a: 3, b: -1 }, y: { a: 0, b: -1 } },
+        { x: { a: 3, b: 1 }, y: { a: 0, b: -2 } },
+        { x: { a: 3, b: 2 }, y: { a: 0, b: -1 } },
+        { x: { a: 2, b: 2 }, y: { a: 1, b: -1 } },
+        { x: { a: 1, b: 2 }, y: { a: 1, b: -1 } },
+        { x: { a: 1, b: 1 }, y: { a: 1, b: 1 } },
+        { x: { a: 1, b: -1 }, y: { a: 1, b: 2 } },
+        { x: { a: 1, b: -1 }, y: { a: 0, b: 2 } },
+        { x: { a: 0, b: -1 }, y: { a: 0, b: 2 } },
+    ];
+
     const hatOutlines = [];
     // Non-reflected hats
     for (let i = 0; i < 6; i++) {
@@ -253,7 +268,7 @@
                 height: window.innerHeight,
                 cx: 0,
                 cy: 0,
-                scale: 16,
+                scale: 8,
                 a: 0.5,
                 coord: null,
                 hats: [],
@@ -304,37 +319,19 @@
             getPolylinePoints2(hat) {
                 const [a, b] = [this.a, 1 - this.a];
 
-                const hatOutline2 = [
-                    { x: { a: 0, b: 0 }, y: { a: 0, b: 0 } },
-                    { x: { a: 0, b: -1 }, y: { a: 0, b: -1 } },
-                    { x: { a: 1, b: -1 }, y: { a: -1, b: -1 } },
-                    { x: { a: 3, b: -1 }, y: { a: -1, b: -1 } },
-                    { x: { a: 3, b: -1 }, y: { a: 0, b: -1 } },
-                    { x: { a: 3, b: 1 }, y: { a: 0, b: -2 } },
-                    { x: { a: 3, b: 2 }, y: { a: 0, b: -1 } },
-                    { x: { a: 2, b: 2 }, y: { a: 1, b: -1 } },
-                    { x: { a: 1, b: 2 }, y: { a: 1, b: -1 } },
-                    { x: { a: 1, b: 1 }, y: { a: 1, b: 1 } },
-                    { x: { a: 1, b: -1 }, y: { a: 1, b: 2 } },
-                    { x: { a: 1, b: -1 }, y: { a: 0, b: 2 } },
-                    { x: { a: 0, b: -1 }, y: { a: 0, b: 2 } },
-                ];
-
                 const af = hat.affine;
 
                 let res = "";
                 let nodes = [];
-                for (let p of hatOutline2) {
-                    const v = af.mulVec(p);
-
-                    const x = a * v.x.a + b * v.x.b;
-                    const y = a * v.y.a + b * v.y.b;
+                for (let p of hat.outline) {
+                    const x = a * p.x.a + b * p.x.b;
+                    const y = a * p.y.a + b * p.y.b;
 
                     const xx = x + y * cos60;
                     const yy = y * sin60;
 
                     res += `${xx} ${yy} `
-                    nodes.push({ v: v, ev: { x: xx, y: yy } });
+                    nodes.push({ v: p, ev: { x: xx, y: yy } });
                 }
                 return { svgPoints: res, nodes: nodes };
             },
@@ -478,11 +475,21 @@
             },
             hoge() {
                 let hats = [];
+                const getOutline = (affine) => {
+                    const outline = [];
+                    for (let p of hatOutline2) {
+                        const v = affine.mulVec(p);
+                        outline.push(v);
+                    }
+                    return outline;
+                }
                 const h = (type, depth, affine) => {
                     if (depth == 0) {
-                        hats.push({ affine: Affine.mul(affine, Affine.rotation(-2)) });
+                        let af = Affine.mul(affine, Affine.rotation(-2));
+                        hats.push({ affine: af, color: 'white', outline: getOutline(af)});
                         if (type == 7) {
-                            hats.push({ affine: Affine.mul(affine, Affine.mul(Affine.rotTransition(1 - 2, { a: 0, b: -2 }, { a: -3, b: 1 }), Affine.flip())) });
+                            af = Affine.mul(affine, Affine.mul(Affine.rotTransition(1 - 2, { a: 0, b: -2 }, { a: -3, b: 1 }), Affine.flip()));
+                            hats.push({ affine: af, color: 'DodgerBlue', outline: getOutline(af)});
                         }
                     }
                     if (depth == 1) {
@@ -517,10 +524,22 @@
                         h(7, depth - 1, Affine.mul(affine, Affine.rotTransition(0, { a: 9, b: 15 }, { a: 3, b: -9 })));
                         h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(1, { a: 18, b: 10 }, { a: -15, b: -23 })));
                         h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(2, { a: 33, b: 33 }, { a: -12, b: -36 })));
+                    }
+                    if (depth == 4) {
+                        h(8, depth - 1, Affine.mul(affine, Affine.identity()));
+                        if (type == 8) {
+                            h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(0, { a: -37, b: -63 }, { a: -13, b: 39 })));
+                        }
+                        h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(-1, { a: -48, b: -26 }, { a: 36, b: 64 })));
+                        h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(-2, { a: -10, b: 36 }, { a: 47, b: 27 })));
+                        h(7, depth - 1, Affine.mul(affine, Affine.rotTransition(0, { a: 23, b: 39 }, { a: 8, b: -24 })));
+                        h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(1, { a: 49, b: 25 }, { a: -38, b: -62 })));
+                        h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(2, { a: 87, b: 87 }, { a: -27, b: -99 })));
+
                         // h(8, depth - 1, Affine.mul(affine, Affine.rotation(2)));
                     }
                 }
-                h(8, 3, Affine.identity());
+                h(8, 4, Affine.identity());
                 return hats;
             },
         },
