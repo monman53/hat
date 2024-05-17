@@ -45,9 +45,8 @@
                 <polygon :points="getPolylinePoints(hat)" fill="white" :stroke="hat.selected ? 'black' : 'gray'"
                     @pointerdown="hatSelect($event, hat, i)" @dblclick="hatReflect($event, hat)" />
             </g> -->
-                <g v-for="(hat, i) in hats2">
-                    <polygon :points="getPolylinePoints2(hat).svgPoints" :fill="hat.color" stroke="black" />
-                </g>
+                <polygon v-for="(hat, i) in hats2" :points="getPolylinePoints2(hat).svgPoints" :fill="hat.color"
+                    stroke="black" />
                 <g v-if="options.showNodes">
                     <g v-for="(hat, i) in hats2">
                         <g v-for="node in getPolylinePoints2(hat).nodes">
@@ -221,6 +220,7 @@
         { x: { a: 0, b: 0 }, y: { a: 0, b: 0 } },
         { x: { a: 0, b: -1 }, y: { a: 0, b: -1 } },
         { x: { a: 1, b: -1 }, y: { a: -1, b: -1 } },
+        { x: { a: 2, b: -1 }, y: { a: -1, b: -1 } },
         { x: { a: 3, b: -1 }, y: { a: -1, b: -1 } },
         { x: { a: 3, b: -1 }, y: { a: 0, b: -1 } },
         { x: { a: 3, b: 1 }, y: { a: 0, b: -2 } },
@@ -483,63 +483,66 @@
                     }
                     return outline;
                 }
-                const h = (type, depth, affine) => {
+                const construct = (type, depth) => {
                     if (depth == 0) {
-                        let af = Affine.mul(affine, Affine.rotation(-2));
-                        hats.push({ affine: af, color: 'white', outline: getOutline(af)});
-                        if (type == 7) {
-                            af = Affine.mul(affine, Affine.mul(Affine.rotTransition(1 - 2, { a: 0, b: -2 }, { a: -3, b: 1 }), Affine.flip()));
-                            hats.push({ affine: af, color: 'DodgerBlue', outline: getOutline(af)});
+                        const quadNode = [2, 6, 8, 10];
+                        const quad = [];
+                        for (let i of quadNode) {
+                            quad.push(hatOutline2[i]);
+                        }
+                        return { type: type, depth: depth, quad: quad, affine: Affine.identity() };
+                    } else {
+                        const clusters = [];
+                        const rules = [
+                            // type, rot degree, prev quad idx connects to, current quad idx connects to prev
+                            [0, 0, [3, 0]],
+                            [1, 1, [2, 0]],
+                            [2, 2, [2, 0]],
+                            [3, 0, [3, 3]],
+                            [4, 4, [0, 0]],
+                            [5, 5, [2, 0]],
+                            [6, 0, [2, 0]],
+                        ]
+                        for (let i = 0; i < 7; i++) {
+                            const r = rules[i];
+                            const cluster = construct(r[0], depth - 1);
+                            clusters.push(cluster);
+                            if (i > 0) {
+                                const from = clusters[i - 1].quad[r[2][0]];
+                                const rotAffine = Affine.rotation(r[1]);
+                                const to = rotAffine.mulVec(clusters[i].quad[r[2][1]]);
+                                const transAffine = Affine.transition({ a: -to.x.a, b: -to.x.b }, { a: -to.y.a, b: -to.y.b });
+                                const affine = Affine.mul(Affine.transition(from.x, from.y), Affine.mul(transAffine, rotAffine));
+                                for (let j = 0; j < 4; j++) {
+                                    clusters[i].quad[j] = affine.mulVec(clusters[i].quad[j]);
+                                }
+                                clusters[i].affine = Affine.mul(affine, clusters[i].affine);
+                            }
+                        }
+                        const nextQuad = [[4, 1], [6, 2], [1, 1], [2, 2]];
+                        const quad = [];
+                        for (let nq of nextQuad) {
+                            quad.push(clusters[nq[0]].quad[nq[1]]);
+                        }
+                        return { type: type, clusters: clusters, quad: quad, depth: depth, affine: Affine.identity() };
+                    }
+                };
+                const traverse = (cluster, affine) => {
+                    if (cluster.depth == 0) {
+                        hats.push({ affine: affine, color: 'white', outline: getOutline(affine) });
+                        if (cluster.type == 3) {
+                            af = Affine.mul(affine, Affine.mul(Affine.rotTransition(1, { a: 3, b: 1 }, { a: 0, b: -2 }), Affine.flip()));
+                            hats.push({ affine: af, color: 'DodgerBlue', outline: getOutline(af) });
+                        }
+                    } else {
+                        const n = cluster.type == 3 ? 6 : 7;
+                        for (let i = 0; i < n; i++) {
+                            const c = cluster.clusters[i];
+                            traverse(c, Affine.mul(affine, c.affine));
                         }
                     }
-                    if (depth == 1) {
-                        h(8, depth - 1, affine);
-                        if (type == 8) {
-                            h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(0, { a: -1, b: -3 }, { a: -1, b: 3 })));
-                        }
-                        h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(-1, { a: 0, b: -2 }, { a: 0, b: 4 })));
-                        h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(-2, { a: 2, b: 0 }, { a: -1, b: 3 })));
-                        h(7, depth - 1, Affine.mul(affine, Affine.rotTransition(0, { a: 3, b: 3 }, { a: 0, b: 0 })));
-                        h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(1, { a: 1, b: 1 }, { a: -2, b: -2 })));
-                        h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(2, { a: 3, b: 3 }, { a: -3, b: -3 })));
-                    }
-                    if (depth == 2) {
-                        h(8, depth - 1, affine);
-                        if (type == 8) {
-                            h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(0, { a: -5, b: -9 }, { a: -2, b: 6 })));
-                        }
-                        h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(-1, { a: -5, b: -5 }, { a: 4, b: 10 })));
-                        h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(-2, { a: 1, b: 3 }, { a: 4, b: 6 })));
-                        h(7, depth - 1, Affine.mul(affine, Affine.rotTransition(0, { a: 4, b: 6 }, { a: 1, b: -3 })));
-                        h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(1, { a: 6, b: 4 }, { a: -6, b: -8 })));
-                        h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(2, { a: 12, b: 12 }, { a: -6, b: -12 })));
-                    }
-                    if (depth == 3) {
-                        h(8, depth - 1, Affine.mul(affine, Affine.identity()));
-                        if (type == 8) {
-                            h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(0, { a: -14, b: -24 }, { a: -5, b: 15 })));
-                        }
-                        h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(-1, { a: -17, b: -11 }, { a: 13, b: 25 })));
-                        h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(-2, { a: -2, b: 12 }, { a: 16, b: 12 })));
-                        h(7, depth - 1, Affine.mul(affine, Affine.rotTransition(0, { a: 9, b: 15 }, { a: 3, b: -9 })));
-                        h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(1, { a: 18, b: 10 }, { a: -15, b: -23 })));
-                        h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(2, { a: 33, b: 33 }, { a: -12, b: -36 })));
-                    }
-                    if (depth == 4) {
-                        h(8, depth - 1, Affine.mul(affine, Affine.identity()));
-                        if (type == 8) {
-                            h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(0, { a: -37, b: -63 }, { a: -13, b: 39 })));
-                        }
-                        h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(-1, { a: -48, b: -26 }, { a: 36, b: 64 })));
-                        h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(-2, { a: -10, b: 36 }, { a: 47, b: 27 })));
-                        h(7, depth - 1, Affine.mul(affine, Affine.rotTransition(0, { a: 23, b: 39 }, { a: 8, b: -24 })));
-                        h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(1, { a: 49, b: 25 }, { a: -38, b: -62 })));
-                        h(8, depth - 1, Affine.mul(affine, Affine.rotTransition(2, { a: 87, b: 87 }, { a: -27, b: -99 })));
-
-                        // h(8, depth - 1, Affine.mul(affine, Affine.rotation(2)));
-                    }
-                }
-                h(8, 4, Affine.identity());
+                };
+                traverse(construct(0, 3), Affine.rotation(-2));
                 return hats;
             },
         },
