@@ -40,7 +40,7 @@
         <div id="svg-wrapper">
             <svg id="main-svg" :view-box.camel="svgViewBox" :width="width" :height="height"
                 @pointerdown="pointerDownHandler" @pointermove="pointerMoveHandler" @pointerup="pointerUpHandler"
-                @wheel="wheelHandler">
+                @wheel="wheelHandler" @dblclick="createHat">
                 <g v-if="mode == 'free'">
                     <polygon v-for="(hat, i) in hats" :points="getPolylinePoints2(hat).svgPoints" fill="white"
                         :stroke="hat.selected ? 'black' : 'gray'" @pointerdown="hatSelect($event, hat, i)"
@@ -60,16 +60,13 @@
             </svg>
         </div>
         <div id="toolbar">
-            <label>
-                <input type="range" min="0" max="1" step="0.001" v-model.number="a">
-                a {{a}}
-            </label><br>
+            <div v-if="mode == 'substitution'">
+                <label>
+                    <input type="range" min="0" max="1" step="0.001" v-model.number="a">
+                    a {{a}}
+                </label>
+            </div>
             Scale: {{ scale }}<br>
-            <label>
-                <input type="checkbox" v-model="options.showNodes">
-                Show nodes
-                <br>
-            </label>
             <label>
                 <input type="radio" value="substitution" v-model="mode" />
                 substitution
@@ -78,8 +75,15 @@
                 <input type="radio" value="free" v-model="mode" />
                 free
             </label>
-            <div v-if="options.showNodes">
-                Node: {{coord}}
+            <div v-if="mode == 'substitution'">
+                <label>
+                    <input type="checkbox" v-model="options.showNodes">
+                    Show nodes
+                    <br>
+                </label>
+                <div v-if="options.showNodes">
+                    Node: {{coord}}
+                </div>
             </div>
         </div>
     </div>
@@ -285,8 +289,6 @@
                 const [x0, y0] = this.getMousePosition(e);
                 const [cogX, cogY] = this.calcCog();
                 for (hat of this.selected) {
-                    hat.dx = hat.x - cogX;
-                    hat.dy = hat.y - cogY;
                     hat.orgAffine = hat.affine;
                 }
                 const [hx0, hy0] = [hat.x, hat.y];
@@ -307,15 +309,30 @@
                     for (hat of this.selected) {
                         hat.affine = Affine.mul(Affine.transition(ab(dxx, 0), ab(dyy, 0)), hat.orgAffine);
                         hat.outline = null;
-                        hat.x = cogX + hat.dx + dxx;
-                        hat.y = cogY + hat.dy + dyy;
                     }
                 }
                 this.moveHandler = handler;
             },
             hatReflect(e, hat) {
+                e.stopPropagation();
                 hat.affine = Affine.mul(hat.affine, Affine.flip());
                 hat.outline = null;
+            },
+            createHat(e) {
+                const [x, y] = this.getMousePosition(e);
+                const xx = (x - this.width / 2) / this.scale + this.cx;
+                const yy = (y - this.height / 2) / this.scale + this.cy;
+
+                // const a = 1;
+                const b = -1 / Math.sqrt(3);
+                // const c = 0;
+                const d = 2 / Math.sqrt(3);
+
+                // TODO: Why is 2* needed?
+                const xxx = Math.round(2 * (xx + b * yy));
+                const yyy = Math.round(2 * (d * yy));
+
+                this.hats.push({ affine: Affine.transition(ab(xxx, 0), ab(yyy, 0)) });
             },
             hoge() {
                 let hats = [];
@@ -387,7 +404,6 @@
             this.hats2 = this.hoge();
             this.hats = [
                 { affine: Affine.identity() },
-                { affine: Affine.flip() },
             ];
         },
     }).mount('#app')
