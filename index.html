@@ -485,32 +485,29 @@
                 }
                 const construct = (type, depth) => {
                     if (depth == 0) {
-                        const quadNode = [2, 6, 8, 10];
-                        const quad = [];
-                        for (let i of quadNode) {
-                            quad.push(hatOutline2[i]);
-                        }
-                        return { type: type, depth: depth, quad: quad, affine: Affine.identity() };
+                        const h = hatOutline2;
+                        const quad = [h[2], h[6], h[8], h[10]];
+                        return { type: type, depth: 0, quad: quad, affine: Affine.identity() };
                     } else {
                         const clusters = [];
                         const rules = [
                             // type, rot degree, prev quad idx connects to, current quad idx connects to prev
-                            [0, 0, [3, 0]],
-                            [1, 1, [2, 0]],
-                            [2, 2, [2, 0]],
-                            [3, 0, [3, 3]],
-                            [4, 4, [0, 0]],
-                            [5, 5, [2, 0]],
-                            [6, 0, [2, 0]],
+                            [0, [3, 0]],
+                            [1, [2, 0]],
+                            [2, [2, 0]],
+                            [0, [3, 3]],
+                            [4, [0, 0]],
+                            [5, [2, 0]],
+                            [0, [2, 0]],
                         ]
                         for (let i = 0; i < 7; i++) {
                             const r = rules[i];
-                            const cluster = construct(r[0], depth - 1);
+                            const cluster = construct(i, depth - 1);
                             clusters.push(cluster);
                             if (i > 0) {
-                                const from = clusters[i - 1].quad[r[2][0]];
-                                const rotAffine = Affine.rotation(r[1]);
-                                const to = rotAffine.mulVec(clusters[i].quad[r[2][1]]);
+                                const from = clusters[i - 1].quad[r[1][0]];
+                                const rotAffine = Affine.rotation(r[0]);
+                                const to = rotAffine.mulVec(clusters[i].quad[r[1][1]]);
                                 const transAffine = Affine.transition({ a: -to.x.a, b: -to.x.b }, { a: -to.y.a, b: -to.y.b });
                                 const affine = Affine.mul(Affine.transition(from.x, from.y), Affine.mul(transAffine, rotAffine));
                                 for (let j = 0; j < 4; j++) {
