@@ -91,20 +91,20 @@
     const { createApp } = Vue
 
     const hatOutline2 = [
-        { x: { a: 0, b: 0 }, y: { a: 0, b: 0 } },
-        { x: { a: 0, b: -1 }, y: { a: 0, b: -1 } },
-        { x: { a: 1, b: -1 }, y: { a: -1, b: -1 } },
-        { x: { a: 2, b: -1 }, y: { a: -1, b: -1 } },
-        { x: { a: 3, b: -1 }, y: { a: -1, b: -1 } },
-        { x: { a: 3, b: -1 }, y: { a: 0, b: -1 } },
-        { x: { a: 3, b: 1 }, y: { a: 0, b: -2 } },
-        { x: { a: 3, b: 2 }, y: { a: 0, b: -1 } },
-        { x: { a: 2, b: 2 }, y: { a: 1, b: -1 } },
-        { x: { a: 1, b: 2 }, y: { a: 1, b: -1 } },
-        { x: { a: 1, b: 1 }, y: { a: 1, b: 1 } },
-        { x: { a: 1, b: -1 }, y: { a: 1, b: 2 } },
-        { x: { a: 1, b: -1 }, y: { a: 0, b: 2 } },
-        { x: { a: 0, b: -1 }, y: { a: 0, b: 2 } },
+        xyab(0, 0, 0, 0),
+        xyab(0, -1, 0, -1),
+        xyab(1, -1, -1, -1),
+        xyab(2, -1, -1, -1),
+        xyab(3, -1, -1, -1),
+        xyab(3, -1, 0, -1),
+        xyab(3, 1, 0, -2),
+        xyab(3, 2, 0, -1),
+        xyab(2, 2, 1, -1),
+        xyab(1, 2, 1, -1),
+        xyab(1, 1, 1, 1),
+        xyab(1, -1, 1, 2),
+        xyab(1, -1, 0, 2),
+        xyab(0, -1, 0, 2),
     ];
 
     const deg60 = Math.PI / 3;
@@ -119,7 +119,7 @@
                 cx: 0,
                 cy: 0,
                 scale: 16,
-                mode: 'free',
+                mode: 'substitution',
                 a: 0.5,
                 coord: null,
                 hats: [],
@@ -215,7 +215,7 @@
                 let cogX = 0;
                 let cogY = 0;
                 for (hat of this.selected) {
-                    const p = hat.affine.mulVec({ x: { a: 0, b: 0 }, y: { a: 0, b: 0 } });
+                    const p = hat.affine.mulVec(xyab(0, 0, 0, 0));
                     cogX += p.x.a;
                     cogY += p.y.a;
                 }
@@ -233,9 +233,9 @@
                     // Rotate around the cog
                     const rot = e.deltaY > 0 ? -1 : 1;
                     const affine = Affine.mul(
-                        Affine.mul(Affine.transition({ a: cogX, b: 0 }, { a: cogY, b: 0 }),
+                        Affine.mul(Affine.transition(ab(cogX, 0), ab(cogY, 0)),
                             Affine.rotation(rot)),
-                        Affine.transition({ a: -cogX, b: 0 }, { a: -cogY, b: 0 }),
+                        Affine.transition(ab(-cogX, 0), ab(-cogY, 0)),
                     );
                     for (hat of this.selected) {
                         hat.affine = Affine.mul(affine, hat.affine);
@@ -305,7 +305,7 @@
                     const dyy = Math.round(2 * (d * dy));
 
                     for (hat of this.selected) {
-                        hat.affine = Affine.mul(Affine.transition({ a: dxx, b: 0 }, { a: dyy, b: 0 }), hat.orgAffine);
+                        hat.affine = Affine.mul(Affine.transition(ab(dxx, 0), ab(dyy, 0)), hat.orgAffine);
                         hat.outline = null;
                         hat.x = cogX + hat.dx + dxx;
                         hat.y = cogY + hat.dy + dyy;
@@ -344,7 +344,7 @@
                                 const from = clusters[i - 1].quad[r[1][0]];
                                 const rotAffine = Affine.rotation(r[0]);
                                 const to = rotAffine.mulVec(clusters[i].quad[r[1][1]]);
-                                const transAffine = Affine.transition({ a: -to.x.a, b: -to.x.b }, { a: -to.y.a, b: -to.y.b });
+                                const transAffine = Affine.transition(ab(-to.x.a, -to.x.b), ab(-to.y.a, -to.y.b));
                                 const affine = Affine.mul(Affine.transition(from.x, from.y), Affine.mul(transAffine, rotAffine));
                                 for (let j = 0; j < 4; j++) {
                                     clusters[i].quad[j] = affine.mulVec(clusters[i].quad[j]);
@@ -364,7 +364,7 @@
                     if (cluster.depth == 0) {
                         hats.push({ affine: affine, color: 'white', outline: this.getOutline(affine) });
                         if (cluster.type == 3) {
-                            af = Affine.mul(affine, Affine.mul(Affine.rotTransition(1, { a: 3, b: 1 }, { a: 0, b: -2 }), Affine.flip()));
+                            af = Affine.mul(affine, Affine.mul(Affine.rotTransition(1, ab(3, 1), ab(0, -2)), Affine.flip()));
                             hats.push({ affine: af, color: 'DodgerBlue', outline: this.getOutline(af) });
                         }
                     } else {
