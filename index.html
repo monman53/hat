@@ -41,16 +41,19 @@
             <svg id="main-svg" :view-box.camel="svgViewBox" :width="width" :height="height"
                 @pointerdown="pointerDownHandler" @pointermove="pointerMoveHandler" @pointerup="pointerUpHandler"
                 @wheel="wheelHandler">
-                <!-- <g v-for="(hat, i) in hats">
-                <polygon :points="getPolylinePoints(hat)" fill="white" :stroke="hat.selected ? 'black' : 'gray'"
-                    @pointerdown="hatSelect($event, hat, i)" @dblclick="hatReflect($event, hat)" />
-            </g> -->
-                <polygon v-for="(hat, i) in hats2" :points="getPolylinePoints2(hat).svgPoints" :fill="hat.color"
-                    stroke="black" />
-                <g v-if="options.showNodes">
-                    <g v-for="(hat, i) in hats2">
-                        <g v-for="node in getPolylinePoints2(hat).nodes">
-                            <circle :cx="node.ev.x" :cy="node.ev.y" r="0.1" @mouseover="coord = node.v" />
+                <g v-if="mode == 'free'">
+                    <polygon v-for="(hat, i) in hats" :points="getPolylinePoints2(hat).svgPoints" fill="white"
+                        :stroke="hat.selected ? 'black' : 'gray'" @pointerdown="hatSelect($event, hat, i)"
+                        @dblclick="hatReflect($event, hat)" />
+                </g>
+                <g v-if="mode == 'substitution'">
+                    <polygon v-for="(hat, i) in hats2" :points="getPolylinePoints2(hat).svgPoints" :fill="hat.color"
+                        stroke="black" />
+                    <g v-if="options.showNodes">
+                        <g v-for="(hat, i) in hats2">
+                            <g v-for="node in getPolylinePoints2(hat).nodes">
+                                <circle :cx="node.ev.x" :cy="node.ev.y" r="0.1" @mouseover="coord = node.v" />
+                            </g>
                         </g>
                     </g>
                 </g>
@@ -67,6 +70,14 @@
                 Show nodes
                 <br>
             </label>
+            <label>
+                <input type="radio" value="substitution" v-model="mode" />
+                substitution
+            </label>
+            <label>
+                <input type="radio" value="free" v-model="mode" />
+                free
+            </label>
             <div v-if="options.showNodes">
                 Node: {{coord}}
             </div>
@@ -78,42 +89,6 @@
 <script src="affine.js"></script>
 <script>
     const { createApp } = Vue
-
-    // const hat = [
-    //     [0, -1],
-    //     [1, -1],
-    //     [1, 0],
-    //     [0, 1],
-    //     [1, 2],
-    //     [2, 1],
-    //     [3, -1],
-    //     [4, -1],
-    // ];
-
-    const rotM = [
-        [1, 0, 0, 1],
-        [0, -1, 1, 1],
-        [-1, -1, 1, 0],
-        [-1, 0, 0, -1],
-        [0, 1, -1, -1],
-        [1, 1, -1, 0],
-    ];
-
-    const hatOutline = [
-        [-1, 0],
-        [-2, -1],
-        [-1, -2],
-        [1, -2],
-        [1, -1],
-        [3, -2],
-        [4, -1],
-        [3, 0],
-        [2, 0],
-        [1, 2],
-        [-1, 3],
-        [-1, 2],
-        [-2, 2],
-    ];
 
     const hatOutline2 = [
         { x: { a: 0, b: 0 }, y: { a: 0, b: 0 } },
@@ -132,30 +107,6 @@
         { x: { a: 0, b: -1 }, y: { a: 0, b: 2 } },
     ];
 
-    const hatOutlines = [];
-    // Non-reflected hats
-    for (let i = 0; i < 6; i++) {
-        let rotOutline = [];
-        for (p of hatOutline) {
-            const x = rotM[i][0] * p[0] + rotM[i][1] * p[1];
-            const y = rotM[i][2] * p[0] + rotM[i][3] * p[1];
-            rotOutline.push([x, y]);
-        }
-        hatOutlines.push(rotOutline);
-    }
-    // X-axis reflected hats
-    for (let i = 0; i < 6; i++) {
-        let rotOutline = [];
-        for (p of hatOutline) {
-            const xx = p[0] + p[1];
-            const yy = - p[1];
-            const x = rotM[i][0] * xx + rotM[i][1] * yy;
-            const y = rotM[i][2] * xx + rotM[i][3] * yy;
-            rotOutline.push([x, y]);
-        }
-        hatOutlines.push(rotOutline);
-    }
-
     const deg60 = Math.PI / 3;
     const cos60 = Math.cos(deg60);
     const sin60 = Math.sin(deg60);
@@ -167,7 +118,8 @@
                 height: window.innerHeight,
                 cx: 0,
                 cy: 0,
-                scale: 8,
+                scale: 16,
+                mode: 'free',
                 a: 0.5,
                 coord: null,
                 hats: [],
@@ -201,24 +153,20 @@
                 }
                 this.selected = [];
             },
-            getPolylinePoints(hat) {
-                let res = "";
-                const r = ((hat.r % 6) + 6) % 6;
-                for (let p of hatOutlines[hat.reflected ? 6 + r : r]) {
-                    const x = hat.x + p[0];
-                    const y = hat.y + p[1];
-
-                    const xx = x + y * cos60;
-                    const yy = y * sin60;
-
-                    res += `${xx} ${yy} `
+            getOutline(affine) {
+                const outline = [];
+                for (let p of hatOutline2) {
+                    const v = affine.mulVec(p);
+                    outline.push(v);
                 }
-                return res;
+                return outline;
             },
             getPolylinePoints2(hat) {
                 const [a, b] = [this.a, 1 - this.a];
 
-                const af = hat.affine;
+                if (!hat.outline) {
+                    hat.outline = this.getOutline(hat.affine);
+                }
 
                 let res = "";
                 let nodes = [];
@@ -267,8 +215,9 @@
                 let cogX = 0;
                 let cogY = 0;
                 for (hat of this.selected) {
-                    cogX += hat.x;
-                    cogY += hat.y;
+                    const p = hat.affine.mulVec({ x: { a: 0, b: 0 }, y: { a: 0, b: 0 } });
+                    cogX += p.x.a;
+                    cogY += p.y.a;
                 }
                 cogX = Math.round(cogX / this.selected.length);
                 cogY = Math.round(cogY / this.selected.length);
@@ -280,26 +229,17 @@
 
                 if (this.hatHeld) {
                     // Hat rotation
-
                     const [cogX, cogY] = this.calcCog();
-
                     // Rotate around the cog
+                    const rot = e.deltaY > 0 ? -1 : 1;
+                    const affine = Affine.mul(
+                        Affine.mul(Affine.transition({ a: cogX, b: 0 }, { a: cogY, b: 0 }),
+                            Affine.rotation(rot)),
+                        Affine.transition({ a: -cogX, b: 0 }, { a: -cogY, b: 0 }),
+                    );
                     for (hat of this.selected) {
-                        const dx = hat.dx;
-                        const dy = hat.dy;
-                        if (e.deltaY > 0) {
-                            // -60 deg rotation
-                            hat.dx = 1 * dx + 1 * dy;
-                            hat.dy = -1 * dx + 0 * dy;
-                            hat.r = (hat.r - 1 + 6) % 6;
-                        } else {
-                            // 60 deg rotation
-                            hat.dx = 0 * dx - 1 * dy;
-                            hat.dy = 1 * dx + 1 * dy;
-                            hat.r = (hat.r + 1 + 6) % 6;
-                        }
-                        hat.x = cogX + hat.dx;
-                        hat.y = cogY + hat.dy;
+                        hat.affine = Affine.mul(affine, hat.affine);
+                        hat.outline = null;
                     }
                 } else {
                     // Zoom in/out
@@ -347,6 +287,7 @@
                 for (hat of this.selected) {
                     hat.dx = hat.x - cogX;
                     hat.dy = hat.y - cogY;
+                    hat.orgAffine = hat.affine;
                 }
                 const [hx0, hy0] = [hat.x, hat.y];
                 const handler = (e_) => {
@@ -359,10 +300,13 @@
                     // const c = 0;
                     const d = 2 / Math.sqrt(3);
 
-                    const dxx = Math.round(dx + b * dy);
-                    const dyy = Math.round(d * dy);
+                    // TODO: Why is 2* needed?
+                    const dxx = Math.round(2 * (dx + b * dy));
+                    const dyy = Math.round(2 * (d * dy));
 
                     for (hat of this.selected) {
+                        hat.affine = Affine.mul(Affine.transition({ a: dxx, b: 0 }, { a: dyy, b: 0 }), hat.orgAffine);
+                        hat.outline = null;
                         hat.x = cogX + hat.dx + dxx;
                         hat.y = cogY + hat.dy + dyy;
                     }
@@ -370,18 +314,11 @@
                 this.moveHandler = handler;
             },
             hatReflect(e, hat) {
-                hat.reflected = !hat.reflected;
+                hat.affine = Affine.mul(hat.affine, Affine.flip());
+                hat.outline = null;
             },
             hoge() {
                 let hats = [];
-                const getOutline = (affine) => {
-                    const outline = [];
-                    for (let p of hatOutline2) {
-                        const v = affine.mulVec(p);
-                        outline.push(v);
-                    }
-                    return outline;
-                }
                 const construct = (type, depth) => {
                     if (depth == 0) {
                         const h = hatOutline2;
@@ -425,10 +362,10 @@
                 };
                 const traverse = (cluster, affine) => {
                     if (cluster.depth == 0) {
-                        hats.push({ affine: affine, color: 'white', outline: getOutline(affine) });
+                        hats.push({ affine: affine, color: 'white', outline: this.getOutline(affine) });
                         if (cluster.type == 3) {
                             af = Affine.mul(affine, Affine.mul(Affine.rotTransition(1, { a: 3, b: 1 }, { a: 0, b: -2 }), Affine.flip()));
-                            hats.push({ affine: af, color: 'DodgerBlue', outline: getOutline(af) });
+                            hats.push({ affine: af, color: 'DodgerBlue', outline: this.getOutline(af) });
                         }
                     } else {
                         const n = cluster.type == 3 ? 6 : 7;
@@ -448,6 +385,10 @@
 
             this.svg = document.getElementById('main-svg');
             this.hats2 = this.hoge();
+            this.hats = [
+                { affine: Affine.identity() },
+                { affine: Affine.flip() },
+            ];
         },
     }).mount('#app')
 </script>
