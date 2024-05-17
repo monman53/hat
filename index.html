@@ -60,30 +60,45 @@
             </svg>
         </div>
         <div id="toolbar">
-            <div v-if="mode == 'substitution'">
-                <label>
-                    <input type="range" min="0" max="1" step="0.001" v-model.number="a">
-                    a {{a}}
-                </label>
+            <div>
+                <fieldset>
+                    <legend>Mode</legend>
+                    <label>
+                        <input type="radio" value="substitution" v-model="mode" />
+                        substitution
+                    </label>
+                    <label>
+                        <input type="radio" value="free" v-model="mode" />
+                        free
+                    </label>
+                </fieldset>
             </div>
-            Scale: {{ scale }}<br>
-            <label>
-                <input type="radio" value="substitution" v-model="mode" />
-                substitution
-            </label>
-            <label>
-                <input type="radio" value="free" v-model="mode" />
-                free
-            </label>
             <div v-if="mode == 'substitution'">
-                <label>
+                <fieldset>
+                    <legend>a</legend>
+                    <label>
+                        <input type="range" min="0" max="1" step="0.001" v-model.number="a">
+                        {{a}}
+                    </label>
+                </fieldset>
+            </div>
+            <fieldset>
+                <legend>Scale</legend>
+                {{ scale }}
+            </fieldset>
+            <fieldset>
+                <legend>Options</legend>
+                <label v-if="mode == 'substitution'">
                     <input type="checkbox" v-model="options.showNodes">
                     Show nodes
                     <br>
                 </label>
-                <div v-if="options.showNodes">
-                    Node: {{coord}}
-                </div>
+            </fieldset>
+            <div v-if="mode == 'substitution'">
+                <fieldset v-if="options.showNodes">
+                    <legend>Node info</legend>
+                    {{coord}}
+                </fieldset>
             </div>
         </div>
     </div>
