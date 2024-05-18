@@ -181,7 +181,7 @@
                 return outline;
             },
             getPolylinePoints2(hat) {
-                const [a, b] = [this.a, 1 - this.a];
+                const [a, b] = this.mode == 'substitution' ? [this.a, 1 - this.a] : [0.5, 0.5];
 
                 if (!hat.outline) {
                     hat.outline = this.getOutline(hat.affine);
