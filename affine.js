@@ -69,7 +69,10 @@ class Affine {
     }
 
     transition(v) {
-        return new Affine(this.a, this.b, ab(this.c.a + v.x.a, this.c.b + v.x.b), this.d, this.e, ab(this.f.a + v.y.a, this.f.b + v.y.b));
+        return new Affine(
+            this.a, this.b, ab(this.a * v.x.a + this.b * v.y.a + this.c.a, this.a * v.x.b + this.b * v.y.b + this.c.b),
+            this.d, this.e, ab(this.d * v.x.a + this.e * v.y.a + this.f.a, this.d * v.x.b + this.e * v.y.b + this.f.b)
+        );
     }
 
     static transition(v) {
@@ -99,11 +102,11 @@ class Affine {
         }
     }
 
+    rotation(i) {
+        return this.mul(Affine.rotation(i));
+    }
+
     static relativeRotation(v, r) {
-        return Affine.mul(
-            Affine.mul(Affine.transition(v),
-                Affine.rotation(r)),
-            Affine.transition(xyab(-v.x.a, -v.x.b, -v.y.a, -v.y.b)),
-        );
+        return Affine.transition(v).rotation(r).transition(xyab(-v.x.a, -v.x.b, -v.y.a, -v.y.b));
     }
 }

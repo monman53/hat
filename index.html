@@ -181,7 +181,7 @@
         },
         watch: {
             iteration() {
-                this.hats2 = this.hoge(this.iteration);
+                this.hats2 = this.construct(this.iteration);
             }
         },
         methods: {
@@ -250,7 +250,7 @@
                 const y = (my - this.height / 2) / this.scale + this.cy;
                 return [x, y];
             },
-            convertToHexCoord(x, y) {
+            convertToHexCoordRound(x, y) {
                 // const a = 1;
                 const b = -1 / Math.sqrt(3);
                 // const c = 0;
@@ -262,7 +262,7 @@
             },
             getMousePositionSVGHex(e) {
                 const [x, y] = this.getMousePositionSVG(e);
-                return this.convertToHexCoord(x, y);
+                return this.convertToHexCoordRound(x, y);
             },
             pointerDownHandler(e) {
                 const [x0, y0] = this.getMousePosition(e);
@@ -371,9 +371,9 @@
                 const [x, y] = this.getMousePositionSVGHex(e);
                 this.hats.push({ affine: Affine.transition(xyab(x, 0, y, 0)), flip: false, tmpRotationAffine: new Affine() });
             },
-            hoge(iteration) {
+            construct(iteration) {
                 let hats = [];
-                const construct = (type, depth) => {
+                const substitution = (type, depth) => {
                     if (depth == 0) {
                         const h = hatOutline2;
                         const quad = [h[2], h[6], h[8], h[10]];
@@ -392,7 +392,7 @@
                         ]
                         for (let i = 0; i < 7; i++) {
                             const r = rules[i];
-                            const cluster = construct(i, depth - 1);
+                            const cluster = substitution(i, depth - 1);
                             clusters.push(cluster);
                             if (i > 0) {
                                 const rotAffine = Affine.rotation(r[0]);
@@ -428,7 +428,7 @@
                         }
                     }
                 };
-                traverse(construct(0, iteration), Affine.rotation(-2));
+                traverse(substitution(0, iteration), Affine.rotation(-2));
                 return hats;
             },
         },
@@ -437,7 +437,7 @@
             window.addEventListener('resize', this.resize);
 
             this.svg = document.getElementById('main-svg');
-            this.hats2 = this.hoge(this.iteration);
+            this.hats2 = this.construct(this.iteration);
             this.hats = [
                 { affine: Affine.identity(), flip: false, tmpRotationAffine: Affine.identity() },
             ];
