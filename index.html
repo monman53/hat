@@ -217,7 +217,6 @@
                 const [a, b] = this.mode == 'substitution' ? [this.a, 1 - this.a] : [0.5, 0.5];
 
                 let affine = hat.affine;
-                // affine = Affine.mul(hat.affine, this.composeTmpAffine(hat));
                 affine = Affine.mul(this.composeTmpAffine(hat), hat.affine);
 
                 if (hat.flip) {
@@ -231,10 +230,8 @@
                 for (let p of hat.outline) {
                     const x = a * p.x.a + b * p.x.b;
                     const y = a * p.y.a + b * p.y.b;
-
                     const xx = x + y * cos60;
                     const yy = y * sin60;
-
                     res += `${xx} ${yy} `
                     nodes.push({ v: p, ev: { x: xx, y: yy } });
                 }
@@ -257,19 +254,18 @@
                 const b = -1 / Math.sqrt(3);
                 // const c = 0;
                 const d = 2 / Math.sqrt(3);
-
                 // TODO: Why is 2* needed?
                 const xx = Math.round(2 * (x + b * y));
                 const yy = Math.round(2 * (d * y));
                 return [xx, yy]
             },
             pointerDownHandler(e) {
-                const [x0, y0] = this.getMousePosition(e);
+                const [x0, y0] = this.getMousePositionSVG(e);
                 const [cx0, cy0] = [this.cx, this.cy];
                 const handler = (e_) => {
-                    const [x, y] = this.getMousePosition(e_);
-                    const dx = (x - x0) / this.scale;
-                    const dy = (y - y0) / this.scale;
+                    const [x, y] = this.getMousePositionSVG(e_);
+                    const dx = x - x0;
+                    const dy = y - y0;
                     this.cx = cx0 - dx;
                     this.cy = cy0 - dy;
                 }
@@ -289,7 +285,6 @@
             composeTmpAffine(hat) {
                 let affine = Affine.identity();
                 if (hat.tmpRotationAffine) {
-                    // affine = Affine.mul(affine, hat.tmpRotationAffine);
                     affine = Affine.mul(hat.tmpRotationAffine, affine);
                 }
                 if (hat.tmpTransitionAffine) {
@@ -302,7 +297,6 @@
                 this.moveHandler = null;
                 for (hat of this.selected) {
                     const tmpAffine = this.composeTmpAffine(hat);
-                    // hat.affine = Affine.mul(hat.affine, tmpAffine);
                     hat.affine = Affine.mul(tmpAffine, hat.affine);
                     this.clearTmpAffine(hat);
                 }
@@ -326,10 +320,8 @@
                 if (this.hatHeld) {
                     // Hat rotation
                     const rot = e.deltaY > 0 ? -1 : 1;
-                    const [x, y] = this.getMousePositionSVG(e);
-                    const [xx, yy] = this.convertToHexCoord(x, y);
-                    const affine = Affine.relativeRotation(xyab(xx, 0, yy, 0), rot);
                     for (hat of this.selected) {
+                        const affine = Affine.relativeRotation(xyab(hat.x0hex, 0, hat.y0hex, 0), rot);
                         hat.tmpRotationAffine = Affine.mul(hat.tmpRotationAffine, affine);
                     }
                 } else {
@@ -370,6 +362,11 @@
                 }
 
                 const [x0, y0] = this.getMousePositionSVG(e);
+                const [x0hex, y0hex] = this.convertToHexCoord(x0, y0);
+                for (hat of this.selected) {
+                    hat.x0hex = x0hex;
+                    hat.y0hex = y0hex;
+                }
                 const handler = (e_) => {
                     const [x, y] = this.getMousePositionSVG(e_);
                     const dx = x - x0;
