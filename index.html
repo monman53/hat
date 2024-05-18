@@ -216,14 +216,16 @@
             getPolylinePoints2(hat) {
                 const [a, b] = this.mode == 'substitution' ? [this.a, 1 - this.a] : [0.5, 0.5];
 
-                let affine = hat.affine;
-                affine = Affine.mul(this.composeTmpAffine(hat), hat.affine);
+                if (this.mode == 'free') {
+                    let affine = hat.affine;
+                    affine = Affine.mul(this.composeTmpAffine(hat), hat.affine);
 
-                if (hat.flip) {
-                    affine = Affine.mul(affine, Affine.flip());
+                    if (hat.flip) {
+                        affine = Affine.mul(affine, Affine.flip());
+                    }
+
+                    hat.outline = this.getOutline(affine);
                 }
-
-                hat.outline = this.getOutline(affine);
 
                 let res = "";
                 let nodes = [];
@@ -260,17 +262,16 @@
                 return [xx, yy]
             },
             pointerDownHandler(e) {
-                const [x0, y0] = this.getMousePositionSVG(e);
+                const [x0, y0] = this.getMousePosition(e);
                 const [cx0, cy0] = [this.cx, this.cy];
                 const handler = (e_) => {
-                    const [x, y] = this.getMousePositionSVG(e_);
-                    const dx = x - x0;
-                    const dy = y - y0;
+                    const [x, y] = this.getMousePosition(e_);
+                    const dx = (x - x0) / this.scale;
+                    const dy = (y - y0) / this.scale;
                     this.cx = cx0 - dx;
                     this.cy = cy0 - dy;
                 }
                 this.moveHandler = handler;
-
                 this.clearSelected();
             },
             pointerMoveHandler(e) {
@@ -328,15 +329,10 @@
                     // Zoom in/out
                     const [x, y] = this.getMousePositionSVG(e);
                     const scaleFactor = 1.2;
-                    if (e.deltaY > 0) {
-                        this.cx = this.cx - (x - this.cx) * (scaleFactor - 1);
-                        this.cy = this.cy - (y - this.cy) * (scaleFactor - 1);
-                        this.scale /= scaleFactor;
-                    } else {
-                        this.cx = this.cx + (x - this.cx) * (1 - 1 / scaleFactor);
-                        this.cy = this.cy + (y - this.cy) * (1 - 1 / scaleFactor);
-                        this.scale *= scaleFactor;
-                    }
+                    const r = e.deltaY > 0 ? 1.2 : 1 / 1.2;
+                    this.cx = this.cx + (x - this.cx) * (1 - r);
+                    this.cy = this.cy + (y - this.cy) * (1 - r);
+                    this.scale /= r;
                 }
             },
             hatSelect(e, hat, i) {
