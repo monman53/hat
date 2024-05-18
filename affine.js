@@ -6,32 +6,45 @@ const xyab = (xa, xb, ya, yb) => {
     return { x: ab(xa, xb), y: ab(ya, yb) };
 }
 
+const vecMinus = (v) => {
+    return xyab(-v.x.a, -v.x.b, -v.y.a, -v.y.b);
+}
+
+const vecSub = (v, w) => {
+    return xyab(
+        v.x.a - w.x.a,
+        v.x.b - w.x.b,
+        v.y.a - w.y.a,
+        v.y.b - w.y.b
+    );
+}
+
 class Affine {
-    constructor(a, b, c, d, e, f) {
+    constructor(a = 1, b = 0, c = ab(0, 0), d = 0, e = 1, f = ab(0, 0)) {
         // Affine matrix
         // a, b, c
         // d, e, f
         // 0, 0, 1
         this.a = a;
         this.b = b;
-        this.c = ab(c.a, c.b);
+        this.c = c;
         this.d = d;
         this.e = e;
-        this.f = ab(f.a, f.b);
+        this.f = f;
     }
 
     static identity() {
-        return new Affine(1, 0, ab(0, 0), 0, 1, ab(0, 0));
+        return new Affine();
     }
 
     mul(m) {
         return new Affine(
-            m.a * this.a + m.b * this.d,
-            m.a * this.b + m.b * this.e,
-            ab(m.a * this.c.a + m.b * this.f.a + m.c.a, m.a * this.c.b + m.b * this.f.b + m.c.b),
-            m.d * this.a + m.e * this.d,
-            m.d * this.b + m.e * this.e,
-            ab(m.d * this.c.a + m.e * this.f.a + m.f.a, m.d * this.c.b + m.e * this.f.b + m.f.b),
+            this.a * m.a + this.b * m.d,
+            this.a * m.b + this.b * m.e,
+            ab(this.a * m.c.a + this.b * m.f.a + this.c.a, this.a * m.c.b + this.b * m.f.b + this.c.b),
+            this.d * m.a + this.e * m.d,
+            this.d * m.b + this.e * m.e,
+            ab(this.d * m.c.a + this.e * m.f.a + this.f.a, this.d * m.c.b + this.e * m.f.b + this.f.b),
         );
     }
 
@@ -55,29 +68,22 @@ class Affine {
         );
     }
 
-    transition(x, y) {
-        return new Affine(this.a, this.b, ab(this.c.a + x.a, this.c.b + x.b), this.d, this.e, ab(this.f.a + y.a, this.f.b + y.b));
+    transition(v) {
+        return new Affine(this.a, this.b, ab(this.c.a + v.x.a, this.c.b + v.x.b), this.d, this.e, ab(this.f.a + v.y.a, this.f.b + v.y.b));
     }
 
-    static transition(x, y) {
-        return new Affine(1, 0, ab(x.a, x.b), 0, 1, ab(y.a, y.b));
+    static transition(v) {
+        return new Affine(1, 0, v.x, 0, 1, v.y);
     }
 
-    static transitionRot(x, y, i) {
-        return this.transition(x, y).mul(this.rotation(i));
-    }
-
-    static rotTransition(i, x, y) {
-        return this.rotation(i).mul(this.transition(x, y));
-    }
-
-    static transitionAdd(x1, y1, x2, y2) {
-        return new Affine(1, 0, ab(x1.a + x2.a, x1.b + x2.b), 0, 1, ab(y1.a + y2.a, y1.b + y2.b));
+    static rotTransition(i, v) {
+        return this.transition(v).mul(this.rotation(i));
     }
 
     static flip() {
         // flip matrix [1, 1, 0, -1]
-        return this.rotation(3).mul(new Affine(1, 1, ab(0, 0), 0, -1, ab(0, 0)));
+        // TODO: remove rotation and use direct affine
+        return (new Affine(1, 1, ab(0, 0), 0, -1, ab(0, 0))).mul(this.rotation(3));
     }
 
     static rotation60() {
@@ -89,15 +95,15 @@ class Affine {
         if (i == 0) {
             return this.identity();
         } else {
-            return this.rotation(i - 1).mul(this.rotation60());
+            return this.rotation60().mul(this.rotation(i - 1));
         }
     }
 
     static relativeRotation(v, r) {
         return Affine.mul(
-            Affine.mul(Affine.transition(v.x, v.y),
+            Affine.mul(Affine.transition(v),
                 Affine.rotation(r)),
-            Affine.transition(ab(-v.x.a, -v.x.b), ab(-v.y.a, -v.y.b)),
+            Affine.transition(xyab(-v.x.a, -v.x.b, -v.y.a, -v.y.b)),
         );
     }
 }
