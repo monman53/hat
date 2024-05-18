@@ -101,6 +101,9 @@
                     Show nodes
                     <br>
                 </label>
+                <div>
+                    <button @click="reset">Reset</button>
+                </div>
             </fieldset>
             <div v-if="mode == 'substitution'">
                 <fieldset v-if="options.showNodes">
@@ -138,6 +141,10 @@
     const cos60 = Math.cos(deg60);
     const sin60 = Math.sin(deg60);
 
+    const scale0 = 16;
+    const iteration0 = 3;
+    const a0 = 0.5;
+
     createApp({
         data() {
             return {
@@ -145,10 +152,10 @@
                 height: window.innerHeight,
                 cx: 0,
                 cy: 0,
-                scale: 16,
+                scale: scale0,
                 mode: 'substitution',
-                iteration: 3,
-                a: 0.5,
+                iteration: iteration0,
+                a: a0,
                 coord: null,
                 hats: [],
                 hats2: [],
@@ -176,6 +183,13 @@
             }
         },
         methods: {
+            reset() {
+                this.cx = 0;
+                this.cy = 0;
+                this.scale = scale0;
+                this.a = a0;
+                this.iteration = iteration0;
+            },
             resize() {
                 this.width = window.innerWidth;
                 this.height = window.innerHeight;
