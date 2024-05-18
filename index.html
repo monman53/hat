@@ -84,13 +84,17 @@
                     <legend>a</legend>
                     <label>
                         <input type="range" min="0" max="1" step="0.001" v-model.number="a">
-                        {{a}}
+                        {{humanReadable(a)}}
                     </label>
+                    <br>
+                    <button @click="a = 0">0</button>
+                    <button @click="a = 0.5">0.5</button>
+                    <button @click="a = 1">1</button>
                 </fieldset>
             </div>
             <fieldset>
                 <legend>Scale</legend>
-                {{ scale }}
+                {{humanReadable(scale)}}
             </fieldset>
             <fieldset>
                 <legend>Options</legend>
@@ -181,6 +185,9 @@
             }
         },
         methods: {
+            humanReadable(x) {
+                return Math.round(x * 1000) / 1000;
+            },
             reset() {
                 this.cx = 0;
                 this.cy = 0;
