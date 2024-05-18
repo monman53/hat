@@ -76,11 +76,9 @@
             <div v-if="mode == 'substitution'">
                 <fieldset>
                     <legend>Iteration</legend>
-                    <label>
-                        <button @click="iteration = Math.max(0, iteration - 1)">-</button>
-                        {{iteration}}
-                        <button @click="iteration = iteration + 1">+</button>
-                    </label>
+                    <button @click="iteration = Math.max(0, iteration - 1)">-</button>
+                    {{iteration}}
+                    <button @click="iteration = iteration + 1">+</button>
                 </fieldset>
                 <fieldset>
                     <legend>a</legend>
