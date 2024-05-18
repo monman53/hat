@@ -42,16 +42,16 @@
                 @pointerdown="pointerDownHandler" @pointermove="pointerMoveHandler" @pointerup="pointerUpHandler"
                 @wheel="wheelHandler" @dblclick="createHat">
                 <g v-if="mode == 'free'">
-                    <polygon v-for="(hat, i) in hats" :points="getPolylinePoints2(hat).svgPoints" fill="white"
+                    <polygon v-for="(hat, i) in hats" :points="getPolylinePoints(hat).svgPoints" fill="white"
                         :stroke="hat.selected ? 'black' : 'gray'" @pointerdown="hatSelect($event, hat, i)"
                         @dblclick="hatReflect($event, hat)" />
                 </g>
                 <g v-if="mode == 'substitution'">
-                    <polygon v-for="(hat, i) in hats2" :points="getPolylinePoints2(hat).svgPoints" :fill="hat.color"
+                    <polygon v-for="(hat, i) in hats2" :points="getPolylinePoints(hat).svgPoints" :fill="hat.color"
                         stroke="black" />
                     <g v-if="options.showNodes">
                         <g v-for="(hat, i) in hats2">
-                            <g v-for="node in getPolylinePoints2(hat).nodes">
+                            <g v-for="node in getPolylinePoints(hat).nodes">
                                 <circle :cx="node.ev.x" :cy="node.ev.y" r="0.1" @mouseover="coord = node.v" />
                             </g>
                         </g>
@@ -82,9 +82,9 @@
                 </fieldset>
                 <fieldset>
                     <legend>a</legend>
+                    {{humanReadable(a)}}<br>
                     <label>
                         <input type="range" min="0" max="1" step="0.001" v-model.number="a">
-                        {{humanReadable(a)}}
                     </label>
                     <br>
                     <button @click="a = 0">0</button>
@@ -122,7 +122,7 @@
 <script>
     const { createApp } = Vue
 
-    const hatOutline2 = [
+    const hatOutline = [
         xyab(0, 0, 0, 0),
         xyab(0, -1, 0, -1),
         xyab(1, -1, -1, -1),
@@ -207,13 +207,13 @@
             },
             getOutline(affine) {
                 const outline = [];
-                for (let p of hatOutline2) {
+                for (let p of hatOutline) {
                     const v = affine.mulVec(p);
                     outline.push(v);
                 }
                 return outline;
             },
-            getPolylinePoints2(hat) {
+            getPolylinePoints(hat) {
                 const [a, b] = this.mode == 'substitution' ? [this.a, 1 - this.a] : [0.5, 0.5];
 
                 if (this.mode == 'free') {
@@ -375,7 +375,7 @@
                 let hats = [];
                 const substitution = (type, depth) => {
                     if (depth == 0) {
-                        const h = hatOutline2;
+                        const h = hatOutline;
                         const quad = [h[2], h[6], h[8], h[10]];
                         return { type: type, depth: 0, quad: quad, affine: new Affine() };
                     } else {
