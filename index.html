@@ -216,9 +216,15 @@
             getPolylinePoints2(hat) {
                 const [a, b] = this.mode == 'substitution' ? [this.a, 1 - this.a] : [0.5, 0.5];
 
-                if (!hat.outline) {
-                    hat.outline = this.getOutline(hat.affine);
+                let affine = hat.affine;
+                // affine = Affine.mul(hat.affine, this.composeTmpAffine(hat));
+                affine = Affine.mul(this.composeTmpAffine(hat), hat.affine);
+
+                if (hat.flip) {
+                    affine = Affine.mul(affine, Affine.flip());
                 }
+
+                hat.outline = this.getOutline(affine);
 
                 let res = "";
                 let nodes = [];
@@ -240,6 +246,23 @@
                 const y = this.height - e.clientY - rect.top;
                 return [x, y];
             },
+            getMousePositionSVG(e) {
+                const [mx, my] = this.getMousePosition(e);
+                const x = (mx - this.width / 2) / this.scale + this.cx;
+                const y = (my - this.height / 2) / this.scale + this.cy;
+                return [x, y];
+            },
+            convertToHexCoord(x, y) {
+                // const a = 1;
+                const b = -1 / Math.sqrt(3);
+                // const c = 0;
+                const d = 2 / Math.sqrt(3);
+
+                // TODO: Why is 2* needed?
+                const xx = Math.round(2 * (x + b * y));
+                const yy = Math.round(2 * (d * y));
+                return [xx, yy]
+            },
             pointerDownHandler(e) {
                 const [x0, y0] = this.getMousePosition(e);
                 const [cx0, cy0] = [this.cx, this.cy];
@@ -259,9 +282,30 @@
                     this.moveHandler(e);
                 }
             },
+            clearTmpAffine(hat) {
+                hat.tmpTransitionAffine = null;
+                hat.tmpRotationAffine = Affine.identity();
+            },
+            composeTmpAffine(hat) {
+                let affine = Affine.identity();
+                if (hat.tmpRotationAffine) {
+                    // affine = Affine.mul(affine, hat.tmpRotationAffine);
+                    affine = Affine.mul(hat.tmpRotationAffine, affine);
+                }
+                if (hat.tmpTransitionAffine) {
+                    affine = Affine.mul(hat.tmpTransitionAffine, affine);
+                }
+                return affine;
+            },
             pointerUpHandler() {
                 this.hatHeld = false;
                 this.moveHandler = null;
+                for (hat of this.selected) {
+                    const tmpAffine = this.composeTmpAffine(hat);
+                    // hat.affine = Affine.mul(hat.affine, tmpAffine);
+                    hat.affine = Affine.mul(tmpAffine, hat.affine);
+                    this.clearTmpAffine(hat);
+                }
             },
             calcCog() {
                 let cogX = 0;
@@ -281,33 +325,24 @@
 
                 if (this.hatHeld) {
                     // Hat rotation
-                    const [cogX, cogY] = this.calcCog();
-                    // Rotate around the cog
                     const rot = e.deltaY > 0 ? -1 : 1;
-                    const affine = Affine.mul(
-                        Affine.mul(Affine.transition(ab(cogX, 0), ab(cogY, 0)),
-                            Affine.rotation(rot)),
-                        Affine.transition(ab(-cogX, 0), ab(-cogY, 0)),
-                    );
+                    const [x, y] = this.getMousePositionSVG(e);
+                    const [xx, yy] = this.convertToHexCoord(x, y);
+                    const affine = Affine.relativeRotation(xyab(xx, 0, yy, 0), rot);
                     for (hat of this.selected) {
-                        hat.affine = Affine.mul(affine, hat.affine);
-                        hat.outline = null;
+                        hat.tmpRotationAffine = Affine.mul(hat.tmpRotationAffine, affine);
                     }
                 } else {
                     // Zoom in/out
-                    const [x, y] = this.getMousePosition(e);
-                    const dx = (x - this.width / 2) / this.scale;
-                    const dy = (y - this.height / 2) / this.scale;
-
+                    const [x, y] = this.getMousePositionSVG(e);
                     const scaleFactor = 1.2;
-
                     if (e.deltaY > 0) {
-                        this.cx = this.cx - dx * (scaleFactor - 1);
-                        this.cy = this.cy - dy * (scaleFactor - 1);
+                        this.cx = this.cx - (x - this.cx) * (scaleFactor - 1);
+                        this.cy = this.cy - (y - this.cy) * (scaleFactor - 1);
                         this.scale /= scaleFactor;
                     } else {
-                        this.cx = this.cx + dx * (1 - 1 / scaleFactor);
-                        this.cy = this.cy + dy * (1 - 1 / scaleFactor);
+                        this.cx = this.cx + (x - this.cx) * (1 - 1 / scaleFactor);
+                        this.cy = this.cy + (y - this.cy) * (1 - 1 / scaleFactor);
                         this.scale *= scaleFactor;
                     }
                 }
@@ -334,53 +369,27 @@
                     this.hats[i] = tmp;
                 }
 
-                const [x0, y0] = this.getMousePosition(e);
-                const [cogX, cogY] = this.calcCog();
-                for (hat of this.selected) {
-                    hat.orgAffine = hat.affine;
-                }
-                const [hx0, hy0] = [hat.x, hat.y];
+                const [x0, y0] = this.getMousePositionSVG(e);
                 const handler = (e_) => {
-                    const [x, y] = this.getMousePosition(e_);
-                    const dx = (x - x0) / this.scale;
-                    const dy = (y - y0) / this.scale;
-
-                    // const a = 1;
-                    const b = -1 / Math.sqrt(3);
-                    // const c = 0;
-                    const d = 2 / Math.sqrt(3);
-
-                    // TODO: Why is 2* needed?
-                    const dxx = Math.round(2 * (dx + b * dy));
-                    const dyy = Math.round(2 * (d * dy));
-
+                    const [x, y] = this.getMousePositionSVG(e_);
+                    const dx = x - x0;
+                    const dy = y - y0;
+                    const [dxx, dyy] = this.convertToHexCoord(dx, dy);
                     for (hat of this.selected) {
-                        hat.affine = Affine.mul(Affine.transition(ab(dxx, 0), ab(dyy, 0)), hat.orgAffine);
-                        hat.outline = null;
+                        hat.tmpTransitionAffine = Affine.transition(ab(dxx, 0), ab(dyy, 0));
                     }
                 }
                 this.moveHandler = handler;
             },
             hatReflect(e, hat) {
                 e.stopPropagation();
-                hat.affine = Affine.mul(hat.affine, Affine.flip());
-                hat.outline = null;
+                hat.flip = !hat.flip;
             },
             createHat(e) {
-                const [x, y] = this.getMousePosition(e);
-                const xx = (x - this.width / 2) / this.scale + this.cx;
-                const yy = (y - this.height / 2) / this.scale + this.cy;
+                const [x, y] = this.getMousePositionSVG(e);
+                const [xx, yy] = this.convertToHexCoord(x, y);
 
-                // const a = 1;
-                const b = -1 / Math.sqrt(3);
-                // const c = 0;
-                const d = 2 / Math.sqrt(3);
-
-                // TODO: Why is 2* needed?
-                const xxx = Math.round(2 * (xx + b * yy));
-                const yyy = Math.round(2 * (d * yy));
-
-                this.hats.push({ affine: Affine.transition(ab(xxx, 0), ab(yyy, 0)) });
+                this.hats.push({ affine: Affine.transition(ab(xx, 0), ab(yy, 0)), flip: false, tmpRotationAffine: Affine.identity() });
             },
             hoge(iteration) {
                 let hats = [];
@@ -451,7 +460,7 @@
             this.svg = document.getElementById('main-svg');
             this.hats2 = this.hoge(this.iteration);
             this.hats = [
-                { affine: Affine.identity() },
+                { affine: Affine.identity(), flip: false, tmpRotationAffine: Affine.identity() },
             ];
         },
     }).mount('#app')

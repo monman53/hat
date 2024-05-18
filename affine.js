@@ -92,4 +92,12 @@ class Affine {
             return this.rotation(i - 1).mul(this.rotation60());
         }
     }
+
+    static relativeRotation(v, r) {
+        return Affine.mul(
+            Affine.mul(Affine.transition(v.x, v.y),
+                Affine.rotation(r)),
+            Affine.transition(ab(-v.x.a, -v.x.b), ab(-v.y.a, -v.y.b)),
+        );
+    }
 }
